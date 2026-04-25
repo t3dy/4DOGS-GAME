@@ -299,6 +299,8 @@ const initialWorld = () => ({
   flashback_fired: false,   // anxiety-triggered flashback is one-shot per run
   cache_quality: 0,         // 0-3, raised by prepare_blanket; affects inspect/visibility
   crockett_episodes: 0,     // count of sundowning episodes this run
+  cache_raid_fired: false,  // tex_finds_cache is one-shot per run
+  bones_lost_to_tex: 0,     // tally for the debrief
 });
 let world = initialWorld();
 let queue = [];
@@ -332,6 +334,12 @@ function tickWorld() {
     queue.unshift("bed_destruction_flashback");
     pushJournal("• anxiety crested → flashback triggered");
   }
+  // Cache raid: Tex finds Okie's stash if it's poorly hidden (one-shot).
+  if (!world.cache_raid_fired && world.bone_cache > 0 && world.cache_quality < 2 && Math.random() < 0.40) {
+    world.cache_raid_fired = true;
+    queue.unshift("tex_finds_cache");
+    pushJournal("• Tex found the cache (quality was " + world.cache_quality + ")");
+  }
   if (world.okie_bladder !== before.bld || world.okie_anxiety !== before.anx) {
     if (world.okie_bladder === 10 && before.bld < 10) pushJournal("• Okie's bladder is full (10/10)");
   }
@@ -352,6 +360,12 @@ const AMBIENTS = [
   "Okie has rotated to face the garage door.",
   "Crockett's shaking again. He does that.",
   "Attila walked over and pressed his head against my leg.",
+  // Solicitation-flavored (Mechanic 12)
+  "Attila is staring at me from the kitchen doorway. He hasn't moved in a minute.",
+  "From somewhere: SQUEAK. Pause. SQUEAK.",
+  "Attila put a paw on my foot. He didn't look at me. He just left it there.",
+  "Tex flopped onto his back in the doorway and waited.",
+  "Okie nudged the garage door with his nose. He didn't ask, exactly.",
 ];
 function tryAmbient() {
   if (Math.random() >= 0.30) return;
@@ -679,6 +693,33 @@ const ENCOUNTERS = {
     },
   },
 
+  tex_finds_cache: {
+    title: "TEX FOUND IT (B005-RAID)",
+    intro: w => "I went into the garage and Tex was already in there.\nHe'd nosed under the kiddie-pool blanket and pulled a bone out. He was chewing it.\nOkie was watching from the doorway.",
+    options: w => [
+      { key:"take_it",  label:"Take the bone back from Tex." },
+      { key:"let_it",   label:"Let Tex have it. He found it fair." },
+      { key:"redirect", label:"Redirect Tex with a different chew." },
+    ],
+    resolve: (w, k) => {
+      if (k === "take_it") {
+        w.bones_lost_to_tex += 0;
+        w.okie_anxiety = Math.min(10, w.okie_anxiety + 1);
+        return { narration: "I took it back. Tex gave it up easy. I put it back under the blanket. Okie sat down. He'll re-bury it later.", next:[] };
+      }
+      if (k === "let_it") {
+        w.bone_cache = Math.max(0, w.bone_cache - 1);
+        w.bones_lost_to_tex += 1;
+        w.okie_anxiety = Math.min(10, w.okie_anxiety + 2);
+        return { narration: "I let Tex keep chewing. He worked it down to nothing in about five minutes. Okie kept watching. Cache: " + w.bone_cache + ".", next:[] };
+      }
+      if (k === "redirect") {
+        w.okie_anxiety = Math.min(10, w.okie_anxiety + 1);
+        return { narration: "I got Tex a different chew. He took it. I put the bone back under the blanket. Okie waited until Tex left, then went over and re-arranged things.", next:[] };
+      }
+    },
+  },
+
   crockett_sundowning: {
     title: "CROCKETT, 2 AM (B-CROCKETT)",
     intro: w => "I woke up around 2. Crockett's standing in the hallway looking at the wall.\nHe's 11. He shakes a little. Sometimes he doesn't seem to know what he was doing.",
@@ -840,10 +881,14 @@ const ENCOUNTERS = {
         ? "Bush: dead.\n"
         : "Bush: still alive.\n";
       const oweLine = owed > 0 ? "Owed: $" + owed + "\n" : "";
+      const lostLine = w.bones_lost_to_tex > 0
+        ? "Bones lost to Tex: " + w.bones_lost_to_tex + "\n"
+        : "";
       return {
         narration:
           bushLine +
           "Bones banked: " + w.bone_cache + "\n" +
+          lostLine +
           "Comedies endured: " + w.score.comedies_endured + "\n" +
           oweLine +
           "Anxiety, final: " + w.okie_anxiety + "/10\n\n" +
@@ -880,6 +925,7 @@ const SCENE_INDEX = [
   ["gate_escape",              "B016 — The Gate Was Open"],
   ["gate_escape_part2",        "B016b — Recovery"],
   ["crockett_sundowning",      "B-Crockett — 2 AM"],
+  ["tex_finds_cache",          "B005-RAID — Tex Found It"],
   ["debrief",                  "DEBRIEF"],
 ];
 

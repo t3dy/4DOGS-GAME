@@ -36,9 +36,9 @@ This is the cleanest example we have of *prepare-then-act* sequencing. Worth mod
 - An actual *consequence* of cache_quality. Right now it changes inspect-narration and that's it. The mechanic exists; the stake doesn't.
 - Watching Okie do the prep on his own. Currently the *player* triggers prep. Could become an autonomous Okie action when cache_quality is low and bones are available.
 
-## Future expansion (priority — this mechanic needs a stake to matter)
+## Future expansion
 
-- **Discovery risk:** Tex enters the garage in a future scene. Probability of finding-and-chewing a bone = inverse of cache_quality. High prep = safe; low prep = bone loss.
+- **Discovery risk:** ✅ **SHIPPED** as `tex_finds_cache` encounter (scene #18). Auto-fires once per run via `tickWorld()` if `bone_cache > 0` AND `cache_quality < 2` AND a 0.40 random roll. High prep (quality ≥ 2) blocks the trigger entirely.
 - **Okie autonomy:** at certain ticks, an ambient interrupt fires: "Okie's pawing at the kiddie pool blanket." Auto-increments cache_quality without player input.
 - **Generalize the pattern:** add a `prepared` flag to other actions where prep matters (e.g., a pre-walk encounter where you can pre-leash quietly to reduce Attila's whine onset).
 
