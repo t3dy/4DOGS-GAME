@@ -103,6 +103,37 @@
   }
   .enc-resolution .red { color: var(--red); }
 
+  .ambient {
+    margin: 10px 0 14px 22px;
+    color: var(--ink-dim);
+    font-style: italic;
+    padding: 6px 14px;
+    border-left: 1px dashed var(--ink-dimmer);
+    font-size: 13px;
+    background: rgba(255,255,255,0.02);
+  }
+
+  .yard-map {
+    display: block;
+    background: #000;
+    color: var(--ink);
+    padding: 10px 16px;
+    margin: 8px 0 12px;
+    border: 1px solid var(--ink-dimmer);
+    font-family: "Courier New", monospace;
+    font-size: 13px;
+    line-height: 1.3;
+    letter-spacing: 4px;
+    white-space: pre;
+  }
+  .yard-map .bush-alive  { color: #4c8; }
+  .yard-map .bush-dying  { color: #cc4; }
+  .yard-map .bush-dead   { color: #844; }
+  .yard-map .legend {
+    color: var(--ink-dimmer); font-size: 10px; letter-spacing: 1px;
+    margin-top: 4px; font-style: italic;
+  }
+
   .options { margin-top: 8px; }
   .option {
     display: block; width: 100%; text-align: left;
@@ -300,9 +331,74 @@ function tickWorld() {
     pushJournal("• anxiety crested → flashback triggered");
   }
   if (world.okie_bladder !== before.bld || world.okie_anxiety !== before.anx) {
-    // Don't journal every drift; only worth noting when bladder maxes out
     if (world.okie_bladder === 10 && before.bld < 10) pushJournal("• Okie's bladder is full (10/10)");
   }
+  tryAmbient();
+}
+
+// Ambient interrupt: ~30% per tick, drops one short flavor line in Ted's voice.
+const AMBIENTS = [
+  "Tex sighed in the next room.",
+  "Crockett shifted in his sleep and barked once.",
+  "Attila is sitting in the hallway watching the front door.",
+  "From the kitchen: a nail clicking on tile, then nothing.",
+  "Okie's ear flicked. He was listening to something I couldn't hear.",
+  "The dishwasher cycled. Crockett startled, then settled.",
+  "A car door slammed two houses down. Four heads came up. Four heads went back down.",
+  "Tex came in, looked at me, walked back out.",
+  "Attila spent 90 seconds arranging himself on the rug.",
+  "Okie has rotated to face the garage door.",
+  "Crockett's shaking again. He does that.",
+  "Attila walked over and pressed his head against my leg.",
+];
+function tryAmbient() {
+  if (Math.random() >= 0.30) return;
+  const line = AMBIENTS[Math.floor(Math.random() * AMBIENTS.length)];
+  const div = document.createElement("div");
+  div.className = "ambient";
+  div.textContent = "[ " + line + " ]";
+  feed.appendChild(div);
+  pushJournal("· " + line.slice(0, 60));
+}
+
+// Multi-ending classifier — short tag + opening + closer in Ted's voice.
+function classifyEnding(w) {
+  const k = w.score.bushes_dead;
+  const c = w.score.comedies_endured;
+  const owe = w.score.neighbors_owed_money || 0;
+  const cache = w.bone_cache;
+  if (k > 0 && owe > 0) return {
+    tag: "AVALANCHE",
+    opening: "It was one of those days. Bush is dead, the cop got his money, and I'm sitting at the kitchen table.",
+    closer:  "Tomorrow's another day. Hopefully a quieter one." };
+  if (owe > 0) return {
+    tag: "INCIDENT REPORT",
+    opening: "Today cost me $200. The dogs are home, but barely.",
+    closer:  "I'm checking the gate twice from now on." };
+  if (k > 0 && cache >= 3) return {
+    tag: "OKIE TRIUMPHANT",
+    opening: "Okie killed the bush AND banked his bones today. He's in the garage looking pleased with himself.",
+    closer:  "Some days are his." };
+  if (k > 0) return {
+    tag: "ONE BUSH DOWN",
+    opening: "The bush is gone. Okie is unbothered.",
+    closer:  "I keep meaning to plant another one." };
+  if (c >= 4) return {
+    tag: "FARCE",
+    opening: "Today was mostly small ridiculous moments. No incidents, no real damage, just dogs being themselves.",
+    closer:  "I'm tired in a good way." };
+  if (cache >= 5) return {
+    tag: "BANKER'S DAY",
+    opening: "Okie banked a lot of bones today. The kiddie pool is heavy.",
+    closer:  "I'll buy another 20-pack at Walmart this week." };
+  if (c === 0 && k === 0 && owe === 0) return {
+    tag: "QUIET TUESDAY",
+    opening: "Nothing really happened today. The dogs were just dogs.",
+    closer:  "These days don't make the file but they're the good ones." };
+  return {
+    tag: "ROUTINE",
+    opening: "A regular day with the dogs.",
+    closer:  "Bedtime." };
 }
 
 // ============================================================================
@@ -314,31 +410,25 @@ const ENCOUNTERS = {
   morning_briefing: {
     title: "MORNING BRIEFING",
     intro: w => {
-      const sleep = w.sleep_location === "garage" ? "the garage, on principle" : "the bedroom floor, in error";
-      return (
-        "You wake. The house is quiet in the way that suggests dogs are\n" +
-        "either asleep or planning something. Okie spent the night in\n" +
-        sleep + ".\n\n" +
-        "The case file for today is open on the kitchen table.\n" +
-        "It does not yet have a title."
-      );
+      const sleep = w.sleep_location === "garage" ? "in the garage" : "in the house (mistake)";
+      return "Morning. Okie slept " + sleep + ".\nThe other dogs are around somewhere.";
     },
     options: w => {
       const opts = [
-        { key:"yard",   label:"Step into the yard. Get the lay of things." },
-        { key:"garage", label:"Go to the garage. Check on the bone economy." },
-        { key:"bed",    label:"Lie back down. It's that kind of morning." },
+        { key:"yard",   label:"Go out to the yard." },
+        { key:"garage", label:"Go to the garage." },
+        { key:"bed",    label:"Get back in bed." },
       ];
-      if (w.scoop_days_ago > 1) opts.push({ key:"scoop", label:"Grab a bag and scoop the yard. Pay the toll." });
+      if (w.scoop_days_ago > 1) opts.push({ key:"scoop", label:"Scoop the yard first." });
       return opts;
     },
     resolve: (w, k) => {
-      if (k === "yard")   return { narration: "You step out. The grass looks guilty. The bush looks alive.", next:["yard_bush"] };
-      if (k === "garage") return { narration: "You open the side door to the garage. The smell of dog and oil rises.", next:["garage_bone_pack"] };
-      if (k === "bed")    return { narration: "You crawl back. The afternoon is hours away. You have time.", next:["bed_face_lick"] };
+      if (k === "yard")   return { narration: "I went out. Bush is right there.", next:["yard_bush"] };
+      if (k === "garage") return { narration: "I opened the garage door.", next:["garage_bone_pack"] };
+      if (k === "bed")    return { narration: "I got back in bed.", next:["bed_face_lick"] };
       if (k === "scoop") {
         w.scoop_days_ago = 0;
-        return { narration: "You scoop. The yard is uglier and cleaner. You earn nothing visible. You'll know.", next:["yard_bush"] };
+        return { narration: "I scooped the yard. It needed it.", next:["yard_bush"] };
       }
     },
   },
@@ -347,11 +437,12 @@ const ENCOUNTERS = {
     title: "THE BLUEBERRY (B001)",
     intro: w => {
       let bs;
-      if (w.bush_health === 3) bs = "still alive, still smug";
-      else if (w.bush_health === 2) bs = "yellowing at the leaves, beginning to suspect";
-      else if (w.bush_health === 1) bs = "wilting in earnest now";
-      else bs = "a memorial — but you knew that";
-      return "THE YARD\n\nThe blueberry bush sits in the dirt strip: " + bs + ".\nOkie is at your heel. His bladder reads " + w.okie_bladder + "/10.\nThe fruit trees keep their counsel.";
+      if (w.bush_health === 3) bs = "alive";
+      else if (w.bush_health === 2) bs = "yellowing";
+      else if (w.bush_health === 1) bs = "wilting";
+      else bs = "dead";
+      return "The bush is in the dirt strip. " + (w.bush_health > 0 ? "It's " + bs + "." : "It's gone. The dirt is still there.") +
+        "\nOkie's bladder is " + w.okie_bladder + "/10.";
     },
     options: w => {
       if (w.bush_health <= 0) return [
@@ -369,125 +460,125 @@ const ENCOUNTERS = {
       ];
     },
     resolve: (w, k) => {
-      if (k === "examine") return { narration: "You examine the bush. Health: " + w.bush_health + "/3. Berries: theoretical.\nThe bush, for its part, examines you back.", next:["yard_bush"] };
+      if (k === "examine") return { narration: "I looked at the bush. Health: " + w.bush_health + "/3. No berries yet.", next:["yard_bush"] };
       if (k === "pee") {
         if (w.okie_bladder <= 0) {
-          return { narration: "Okie squats with conviction. Lifts a leg with conviction. The bush, prepared\nfor catastrophe, gets a thin disappointment instead. The bush, briefly, exhales.\nOkie is humiliated.", next:["yard_bush"] };
+          return { narration: "Okie tried but his bladder's empty. Nothing happened. He looked annoyed.", next:["yard_bush"] };
         }
         w.bush_health--;
         w.okie_bladder = Math.max(0, w.okie_bladder - 3);
         if (w.bush_health <= 0) {
           w.score.bushes_dead++;
-          return { narration: "─────────────────────────────────────────────\nTHE BLUEBERRY BUSH IS DEAD.\nCause of death: a small dog with strong opinions.\nSuspect: in the room. Showing no remorse.\n─────────────────────────────────────────────", next:["debrief"], red:true };
+          return { narration: "Okie peed on the bush again. It's dead now.\nLike the real one.", next:["debrief"], red:true };
         }
         const stages = { 2: "yellowing", 1: "wilting" };
-        return { narration: "Okie circles. Lifts a leg. The bush is now " + stages[w.bush_health] + ".", next:["yard_bush"] };
+        return { narration: "Okie peed on the bush. The leaves are " + stages[w.bush_health] + ".", next:["yard_bush"] };
       }
       if (k === "call_off") {
         w.okie_bladder = Math.max(0, w.okie_bladder - 3);
-        return { narration: "You call him off. He pees on the lawn instead. The lawn will yellow.\nThe bush exhales — quietly, in case you change your mind.", next:["yard_passerby"] };
+        return { narration: "I called him off. He peed on the lawn instead. That spot's going to yellow.", next:["yard_passerby"] };
       }
-      if (k === "memorial") return { narration: "You stand on the dead-bush tile. The dirt remembers. Okie sits beside you,\nnot quite contrite. The wind, helpfully, says nothing." };
-      if (k === "leave")    return { narration: "You leave the yard. The bush survives this turn.", next:["garage_bone_pack"] };
+      if (k === "memorial") return { narration: "I stood where the bush used to be. Okie sat next to me." };
+      if (k === "leave")    return { narration: "I left the yard. Bush is fine for now.", next:["garage_bone_pack"] };
     },
   },
 
   yard_passerby: {
     title: "TRAFFIC (B009)",
-    intro: w => "A diesel rumble climbs 15th Ave. A logging truck, by the sound.\nTex, somewhere in the garage, has noticed. So has Okie.\nA bark begins. A second bark answers. They amplify.",
+    intro: w => "A truck went up 15th Ave. Probably a logging truck.\nOkie and Tex started barking from the garage. They keep going after it's gone.",
     options: w => [
-      { key:"shush",  label:"Go inside, shush them. Restore order." },
-      { key:"watch",  label:"Stay in the yard. Listen. Time it." },
-      { key:"join",   label:"Bark with them. (Why not.)" },
+      { key:"shush",  label:"Go shush them." },
+      { key:"watch",  label:"Just listen." },
+      { key:"join",   label:"Bark too." },
     ],
     resolve: (w, k) => {
-      if (k === "shush") return { narration: "You go in. You shush. You are obeyed for forty seconds. Then it resumes.\nThe truck is long past. The barking is now about itself.", next:["garage_bone_pack"] };
-      if (k === "watch") { w.score.comedies_endured++; return { narration: "You stand in the yard and watch them watch the world. Six seconds after the truck\nis gone, they continue. On principle. You count the principles.", next:["garage_bone_pack"] }; }
-      if (k === "join")  { w.score.comedies_endured++; return { narration: "You bark. The dogs look at you with a kind of professional disappointment.\nThe truck driver does not hear. The neighbors hear. You stop.", next:["garage_bone_pack"] }; }
+      if (k === "shush") return { narration: "I went in and shushed them. They stopped for about forty seconds, then started up again.", next:["garage_bone_pack"] };
+      if (k === "watch") { w.score.comedies_endured++; return { narration: "I listened. They went six more seconds after the truck was gone.", next:["garage_bone_pack"] }; }
+      if (k === "join")  { w.score.comedies_endured++; return { narration: "I barked too. The dogs looked at me like I was being weird. I stopped.", next:["garage_bone_pack"] }; }
     },
   },
 
   garage_bone_pack: {
     title: "THE BONE BANK (B005)",
-    intro: w => "THE GARAGE\n\nAn Old Roy bag is open in the corner. " + w.bones_in_pack + " bones remain.\nThe kiddie-pool beds wait, blankets piled. Okie has noticed.\nHis current cache (under the blanket): " + w.bone_cache + ".",
+    intro: w => "In the garage. There's an open Old Roy bag — " + w.bones_in_pack + " rawhides left.\nOkie's cache under the kiddie-pool bed blanket is at " + w.bone_cache + ".",
     options: w => {
       const opts = [];
       if (w.bones_in_pack > 0) {
-        opts.push({ key:"hand_one", label:"Give Okie one bone. Watch the ritual." });
-        if (w.bones_in_pack >= 3) opts.push({ key:"hand_three", label:"Give him three. Make a deposit." });
+        opts.push({ key:"hand_one", label:"Give Okie one bone." });
+        if (w.bones_in_pack >= 3) opts.push({ key:"hand_three", label:"Give him three." });
       }
-      opts.push({ key:"inspect",  label:"Lift a blanket. Inspect the cache." });
-      opts.push({ key:"close_bag", label:"Close the bag. End the deposit window." });
+      opts.push({ key:"inspect",  label:"Lift the blanket and look at the stash." });
+      opts.push({ key:"close_bag", label:"Close the bag." });
       return opts;
     },
     resolve: (w, k) => {
       if (k === "hand_one") {
         w.bones_in_pack--; w.bone_cache++;
-        return { narration: "You hand Okie a bone. He carries it like contraband to the kiddie pool.\nThe blanket lifts. The bone joins its kin. Cache: " + w.bone_cache + ". He is content.", next:["garage_bone_pack"] };
+        return { narration: "I gave him a bone. He took it to the kiddie pool, lifted the blanket with his nose, and put it under. Cache: " + w.bone_cache + ".", next:["garage_bone_pack"] };
       }
       if (k === "hand_three") {
         const took = Math.min(3, w.bones_in_pack); w.bones_in_pack -= took; w.bone_cache += took;
-        return { narration: "Three bones, three trips. He paces with purpose. The cache is now " + w.bone_cache + ".\nSomewhere, a small dog believes himself a banker. He's not wrong.", next:["garage_okie_anxious"] };
+        return { narration: "Three bones, three trips. Cache is at " + w.bone_cache + " now.", next:["garage_okie_anxious"] };
       }
-      if (k === "inspect") return { narration: "You lift the blanket. " + w.bone_cache + " bones, arranged with no system you can detect.\nOkie watches from the doorway. You replace the blanket. Some things are not yours to count.", next:["garage_bone_pack"] };
-      if (k === "close_bag") return { narration: "You close the bag. The deposit window is shut.\n" + w.bones_in_pack + " bones remain in reserve. Okie sighs the sigh of a banker mid-quarter.", next:["garage_okie_anxious"] };
+      if (k === "inspect") return { narration: "I lifted the blanket. " + w.bone_cache + " bones under there. Okie watched me from the door. I put the blanket back.", next:["garage_bone_pack"] };
+      if (k === "close_bag") return { narration: "I closed the bag. " + w.bones_in_pack + " left in reserve.", next:["garage_okie_anxious"] };
     },
   },
 
   garage_okie_anxious: {
     title: "ANXIETY (B006)",
-    intro: w => "Okie paces near the inner door. He nudges it with his nose.\nHis anxiety reads " + w.okie_anxiety + "/10 and rising. The garage is his bunker;\nthe bunker is, however, only a bunker if the door stays closed.",
+    intro: w => "Okie's pacing at the inner door. Anxiety " + w.okie_anxiety + "/10.\nThe garage is his safe place. He wants me to leave him in here.",
     options: w => {
       const opts = [
-        { key:"comfort", label:"Sit on the floor with him. Wait it out." },
-        { key:"toy",     label:"Bring a chew toy. Distract." },
-        { key:"ignore",  label:"Walk away. Let him self-regulate." },
+        { key:"comfort", label:"Sit on the floor with him." },
+        { key:"toy",     label:"Get him a chew toy." },
+        { key:"ignore",  label:"Walk away." },
       ];
-      if (w.scoop_days_ago > 1) opts.push({ key:"scoop_diversion", label:"Take him with you to scoop the yard. Mutual labor." });
+      if (w.scoop_days_ago > 1) opts.push({ key:"scoop_diversion", label:"Take him out with me to scoop the yard." });
       return opts;
     },
     resolve: (w, k) => {
-      if (k === "comfort") { w.okie_anxiety = Math.max(0, w.okie_anxiety - 3); return { narration: "You sit. He folds himself against your leg. The anxiety drops two notches.\nNo words exchanged. None needed.", next:["bed_face_lick"] }; }
-      if (k === "toy")     { w.okie_anxiety = Math.max(0, w.okie_anxiety - 2); return { narration: "You bring a chew toy. He accepts. The pacing pauses. Investment: low. Return: adequate.", next:["bed_face_lick"] }; }
-      if (k === "ignore")  { w.okie_anxiety = Math.min(10, w.okie_anxiety + 2); return { narration: "You walk away. The pacing accelerates. A flashback flickers — an old bed,\nshredded foam, a tail held low. You pretend you didn't see it.", next:["bed_face_lick"] }; }
-      if (k === "scoop_diversion") { w.scoop_days_ago = 0; w.okie_anxiety = Math.max(0, w.okie_anxiety - 4); return { narration: "You take him out with you. He supervises the scoop with the gravity of a foreman.\nThe yard improves. So does he. So, frankly, do you.", next:["bed_face_lick"] }; }
+      if (k === "comfort") { w.okie_anxiety = Math.max(0, w.okie_anxiety - 3); return { narration: "I sat down. He pressed against my leg. He calmed down.", next:["bed_face_lick"] }; }
+      if (k === "toy")     { w.okie_anxiety = Math.max(0, w.okie_anxiety - 2); return { narration: "I got him a chew toy. He took it. The pacing stopped.", next:["bed_face_lick"] }; }
+      if (k === "ignore")  { w.okie_anxiety = Math.min(10, w.okie_anxiety + 2); return { narration: "I walked away. He kept pacing. I remembered when they used to shred their dog beds.", next:["bed_face_lick"] }; }
+      if (k === "scoop_diversion") { w.scoop_days_ago = 0; w.okie_anxiety = Math.max(0, w.okie_anxiety - 4); return { narration: "I took him out with me. He stood there watching me scoop. He calmed down. So did I.", next:["bed_face_lick"] }; }
     },
   },
 
   attila_whine: {
     title: "PRE-WALK WHINE (B010)",
-    intro: w => "THE GARAGE — LATE MORNING\n\nAttila has noticed the leash on the hook. He has not moved toward it.\nHe doesn't have to. The whine starts low — a sound out of scale with\nhis body — and rises. One hundred pounds of dog, pitched like a kettle.",
+    intro: w => "Attila saw me grab the leash. He's already whining.\nHe's 100 pounds and the whine sounds ridiculous coming out of him.",
     options: w => {
       const opts = [
-        { key:"leash_now", label:"Clip the leash. Open the door. Go." },
-        { key:"wait_quiet", label:"Wait. Do not move. See if he stops." },
-        { key:"abandon",    label:"Hang the leash back up. He will live." },
+        { key:"leash_now", label:"Clip the leash, open the door, go." },
+        { key:"wait_quiet", label:"Wait and see if he stops." },
+        { key:"abandon",    label:"Put the leash back." },
       ];
-      if (w.okie_anxiety <= 4) opts.push({ key:"bring_okie", label:"Take Okie with you. Two dogs. One leash. Chaos." });
+      if (w.okie_anxiety <= 4) opts.push({ key:"bring_okie", label:"Take Okie too." });
       return opts;
     },
     resolve: (w, k) => {
-      if (k === "leash_now") { w.leashed = true; w.garage_door_open = true; w.score.comedies_endured++; return { narration: "You clip the leash. The whine crescendos. You open the garage door.\nThe whine does not stop. The whine has become a matter of principle.\nThe two of you walk out into the morning, accompanied by a soundtrack\nno one would believe.", next:["bed_face_lick"] }; }
-      if (k === "wait_quiet") return { narration: "You wait. Forty seconds pass. The whine does not abate. It cycles.\nAt second forty-five you understand: it will not stop on its own.\nThis is the lesson, and you have learned it before.", next:["attila_whine"] };
-      if (k === "abandon") { w.score.comedies_endured++; return { narration: "You hang the leash back up. Attila looks at you. The whine pivots,\nsmoothly, into something quieter — a low, wronged register.\nHe'll forgive you by lunch. You will not forgive yourself by then.", next:["bed_face_lick"] }; }
-      if (k === "bring_okie") { w.leashed = true; w.garage_door_open = true; w.okie_anxiety = Math.max(0, w.okie_anxiety - 1); w.score.comedies_endured += 2; return { narration: "You clip both leashes. Two dogs, one human, three opinions.\nAttila stops whining the moment Okie steps out the door — vindicated,\napparently, by company. Okie's anxiety eases. Yours does not.", next:["bed_face_lick"] }; }
+      if (k === "leash_now") { w.leashed = true; w.garage_door_open = true; w.score.comedies_endured++; return { narration: "I leashed him and opened the garage door. He kept whining the whole time, getting louder as the door went up.", next:["bed_face_lick"] }; }
+      if (k === "wait_quiet") return { narration: "I waited. He didn't stop. He never stops once he starts.", next:["attila_whine"] };
+      if (k === "abandon") { w.score.comedies_endured++; return { narration: "I put the leash back. He stopped whining and gave me a look.", next:["bed_face_lick"] }; }
+      if (k === "bring_okie") { w.leashed = true; w.garage_door_open = true; w.okie_anxiety = Math.max(0, w.okie_anxiety - 1); w.score.comedies_endured += 2; return { narration: "I leashed both of them. Attila stopped whining as soon as Okie was next to him. Okie was happier too.", next:["bed_face_lick"] }; }
     },
   },
 
   squeak_steal: {
     title: "SQUEAK & STEAL (B003+B004)",
-    intro: w => "THE LIVING ROOM\n\nFrom the corner: SQUEAK. Pause. SQUEAK. Pause. SQUEAK.\nAttila is working the pink pig. He is not playing — he is signaling.\nThe pause-then-squeak is the give-away. He wants you in the room.\nAcross the rug, Crockett has lifted his head. He is also paying attention,\nbut for different reasons.",
+    intro: w => "Attila's working the pink pig. SQUEAK. Pause. SQUEAK.\nThat's how he asks for attention.\nCrockett's noticed too.",
     options: w => [
-      { key:"engage",    label:"Sit with Attila. Receive the request." },
-      { key:"ignore",    label:"Stay where you are. Let it run its course." },
-      { key:"intercept", label:"Pet Crockett first. Defuse the steal." },
-      { key:"watch",     label:"Do nothing. Watch. Take notes." },
+      { key:"engage",    label:"Go sit with Attila." },
+      { key:"ignore",    label:"Ignore it." },
+      { key:"intercept", label:"Pet Crockett first." },
+      { key:"watch",     label:"Just watch." },
     ],
     resolve: (w, k) => {
-      if (k === "engage") return { narration: "You sit with Attila. He stops squeaking immediately, dignity restored.\nCrockett, foreclosed, sighs and lays his head back down.\nNo theft today. The pig is safe.", next:["attila_whine"] };
-      if (k === "ignore") { w.score.comedies_endured++; return { narration: "You ignore the squeaks. Three more cycles. Then a slow padding sound.\nCrockett walks across the rug, low and deliberate. The squeaking stops.\nAttila blinks. The pig is now Crockett's. Crockett does not squeak it.\nHe just holds it, like evidence.", next:["attila_whine"] }; }
-      if (k === "intercept") return { narration: "You pet Crockett, who accepts but does not relax. The squeak loop continues.\nAfter a minute Crockett wanders off, his criminal intent only deferred.\nThe pink pig squeaks once more, and Attila — getting no human — sighs.", next:["attila_whine"] };
-      if (k === "watch") { w.score.comedies_endured++; return { narration: "You take notes. Attila signals. Crockett pads. Theft occurs at second 47.\nAttila's reaction frame: a single, slow blink. You record this.\nSomewhere a future game design benefits.", next:["attila_whine"] }; }
+      if (k === "engage") return { narration: "I sat with Attila. He stopped squeaking. Crockett went back to sleep.", next:["attila_whine"] };
+      if (k === "ignore") { w.score.comedies_endured++; return { narration: "I ignored it. After a few minutes Crockett got up and stole the pig from him. Attila just blinked.", next:["attila_whine"] }; }
+      if (k === "intercept") return { narration: "I petted Crockett. He didn't relax. After a minute he wandered off. Attila kept squeaking.", next:["attila_whine"] };
+      if (k === "watch") { w.score.comedies_endured++; return { narration: "I just watched. Attila squeaked. Crockett walked over. Theft happened around second 47.", next:["attila_whine"] }; }
     },
   },
 
@@ -495,71 +586,71 @@ const ENCOUNTERS = {
     title: "FACE-LICK (B012)",
     intro: w => {
       const ghost = w.score.bushes_dead > 0
-        ? "Through the window you can see the dirt strip. The bush is not there.\nIt is and isn't there. Anyway.\n\n"
+        ? "I can see the dirt strip from the window. The bush is gone.\n\n"
         : "";
       const anxious = w.okie_anxiety >= 6
-        ? "Okie is wound tight today — he leans into you with the weight of someone\nwho has been pacing for an hour.\n"
+        ? "Okie's been pacing all morning. He pressed up against me hard.\n"
         : "";
-      return "THE BEDROOM, AFTERNOON\n\n" + ghost +
-        "You lie down. Not to sleep — to stop. Okie pads in.\nConsiders. Joins. He is too close to your face. He is professional about it.\n" + anxious +
-        "The tongue is loaded.";
+      return "I'm in bed. Afternoon. Not sleeping, just lying down.\n" + ghost +
+        "Okie jumped up and is right by my face.\n" + anxious +
+        "He eats poop. He's about to lick me.";
     },
     options: w => {
-      const scoopLabel = ({0:"today", 1:"yesterday"})[w.scoop_days_ago] || "I don't want to talk about it";
+      const scoopLabel = ({0:"today", 1:"yesterday"})[w.scoop_days_ago] || "I don't want to think about it";
       return [
-        { key:"dodge",  label:"Dodge the lick. (Reflex defense.)" },
-        { key:"accept", label:"Accept the lick. (Hope.)" },
-        { key:"think",  label:"Think about the yard scoop first. (Last scoop: " + scoopLabel + ".)" },
-        { key:"eject",  label:"Push him off the bed. (Cowardly. Effective.)" },
+        { key:"dodge",  label:"Turn my head." },
+        { key:"accept", label:"Let him." },
+        { key:"think",  label:"Think about when I last scooped. (" + scoopLabel + ")" },
+        { key:"eject",  label:"Push him off the bed." },
       ];
     },
     resolve: (w, k) => {
-      if (k === "dodge") return { narration: "You turn your head. Tongue grazes the cheek. Negligible damage.\nOkie looks affronted. He'll forget by dinner.", next:["debrief"] };
+      if (k === "dodge") return { narration: "I turned my head. He got my cheek. Whatever.", next:["debrief"] };
       if (k === "accept") {
         const s = w.scoop_days_ago;
         let line;
-        if (s === 0) { w.score.comedies_endured++; line = "You let him. Warm and brief and undignified, like all good things.\nThe yard is clean today. You earned this."; }
-        else if (s === 1) { w.score.comedies_endured++; line = "You let him. Halfway through, you remember yesterday. You did not scoop.\nThe taste, when it arrives, is informational."; }
-        else { w.score.comedies_endured += 2; line = "You let him. The lick lasts an unreasonable duration. You will taste this for hours.\nYou knew. You did it anyway. There's a name for that. You won't say it."; }
+        if (s === 0) { w.score.comedies_endured++; line = "I let him. Yard's clean today. It's fine."; }
+        else if (s === 1) { w.score.comedies_endured++; line = "I let him. I didn't scoop yesterday. I'll think about it for a while."; }
+        else { w.score.comedies_endured += 2; line = "I let him. I haven't scooped in days. I'll regret this."; }
         return { narration: line, next:["debrief"] };
       }
       if (k === "think") {
-        const scoopLabel = ({0:"today", 1:"yesterday"})[w.scoop_days_ago] || "uncertain";
-        return { narration: "You think back. Last scoop: " + scoopLabel + ".\nOkie waits, tongue patient. The math is yours to do.", next:["bed_face_lick"] };
+        const scoopLabel = ({0:"today", 1:"yesterday"})[w.scoop_days_ago] || "I don't remember";
+        return { narration: "Last scoop: " + scoopLabel + ".\nHe's still right there.", next:["bed_face_lick"] };
       }
-      if (k === "eject") return { narration: "You push him off. He goes, with dignity. The bed feels larger and lonelier.\nYou will regret this in twenty minutes.", next:["debrief"] };
+      if (k === "eject") return { narration: "I pushed him off. He got down. I'll regret this later.", next:["debrief"] };
     },
   },
 
   tex_belly_roll: {
     title: "BELLY (B002)",
-    intro: w => "THE LIVING ROOM\n\nTex enters at a trot, sees you, and — without breaking stride — collapses\ntheatrically onto his back, all four legs in the air like an upended\nbeetle. The belly is offered. The terms are clear.",
+    intro: w => "Tex came in and immediately flopped onto his back, legs in the air.\nThis is his thing. Okie doesn't do this.",
     options: w => [
-      { key:"rub",        label:"Rub the belly. Honor the contract." },
-      { key:"rub_call",   label:"Rub Tex AND call Okie over. Test the brotherhood." },
-      { key:"ignore",     label:"Step over him. He's blocking the hallway." },
-      { key:"photograph", label:"Take a photo first. Then rub." },
+      { key:"rub",        label:"Rub his belly." },
+      { key:"rub_call",   label:"Rub him and call Okie over." },
+      { key:"ignore",     label:"Step over him." },
+      { key:"photograph", label:"Take a photo first." },
     ],
     resolve: (w, k) => {
-      if (k === "rub")        return { narration: "You rub. Tex's eyes close. A small sound escapes him — not a sigh, exactly,\nmore an editorial remark on the quality of the rub. The contract holds.", next:["debrief"] };
-      if (k === "rub_call")   { w.score.comedies_endured++; return { narration: "You call Okie over. Okie arrives, looks at Tex on the floor, looks at you,\nlooks at the ceiling, declines to participate. Tex, undeterred, kicks one leg.\nThe belly remains on offer. Okie walks away.", next:["debrief"] }; }
-      if (k === "ignore")     return { narration: "You step over him. Tex tracks your passage with grave eyes.\nThe belly stays out, in case you reconsider. You will. Not now.", next:["debrief"] };
-      if (k === "photograph") { w.score.comedies_endured++; return { narration: "You photograph the offering. Tex holds the pose with professional patience.\nThen you rub. Documentation and labor — the two pillars of any good case file.", next:["debrief"] }; }
+      if (k === "rub")        return { narration: "I rubbed his belly. He closed his eyes.", next:["debrief"] };
+      if (k === "rub_call")   { w.score.comedies_endured++; return { narration: "I called Okie over. Okie came in, looked at Tex on the floor, looked at me, walked away.", next:["debrief"] }; }
+      if (k === "ignore")     return { narration: "I stepped over him. He stayed there with the belly still out.", next:["debrief"] };
+      if (k === "photograph") { w.score.comedies_endured++; return { narration: "I took a picture first. Tex held the pose. Then I rubbed.", next:["debrief"] }; }
     },
   },
 
   bed_destruction_flashback: {
     title: "FLASHBACK (B007)",
-    intro: w => "[A memory cuts in. Desaturated. Old.]\n\nShredded foam across the living room floor.\nA torn bed lining, white tufts caught in the carpet pile.\nThe dogs' tails low — not guilty, exactly. Wronged.\n\nYou had thought you were busy. You had thought wrong.\nThe kiddie pools came after this.",
+    intro: w => "[Memory.]\n\nThe dogs used to shred their dog beds when they got frustrated.\nFoam everywhere. Tufts in the carpet.\nWe switched to kiddie pools with blankets after that.",
     options: w => [
-      { key:"linger",   label:"Stay in the memory a moment. Acknowledge it." },
-      { key:"push",     label:"Push past it. The present is loud enough." },
-      { key:"document", label:"Write it down for the case file." },
+      { key:"linger",   label:"Stay with it for a minute." },
+      { key:"push",     label:"Move on." },
+      { key:"document", label:"Write it down." },
     ],
     resolve: (w, k) => {
-      if (k === "linger")   return { narration: "You let it sit. The shredded foam, the wronged tails. A small grief\nfor a small history. Then it passes, like weather. The kiddie pools are\nstill there when you come back.", next:["debrief"] };
-      if (k === "push")     return { narration: "You push past. The present resumes its full volume. Somewhere a dog\nis breathing, or whining, or planning. You return to the room.", next:["debrief"] };
-      if (k === "document") { w.score.comedies_endured++; return { narration: "You write it down. THE BED YEARS, you label the page. You will not\nshow this to anyone. The case file is not for that.", next:["debrief"] }; }
+      if (k === "linger")   return { narration: "I sat with the memory. Then it passed.", next:["debrief"] };
+      if (k === "push")     return { narration: "I shook it off. Back to now.", next:["debrief"] };
+      if (k === "document") { w.score.comedies_endured++; return { narration: "I wrote it down. THE BED YEARS.", next:["debrief"] }; }
     },
   },
 
@@ -567,163 +658,153 @@ const ENCOUNTERS = {
     title: "NIGHTTIME — WHERE DOES OKIE SLEEP (B008)",
     intro: w => {
       const bushNote = w.score.bushes_dead > 0
-        ? "Outside, in the dirt strip, the blueberry bush is finishing\nits second day of being dead. The yard does not feel different,\nwhich is somehow worse.\n\n"
+        ? "The bush in the dirt strip is dead. Same as in real life.\n\n"
         : "";
-      return "10:47 PM\n\n" + bushNote +
-        "The dishwasher rumbles. The dogs are in their stations.\nThe question, every night: where does Okie sleep.\nThe history is not on his side. Neither is the carpet.";
+      return "Almost 11pm. " + bushNote +
+        "Okie has to sleep somewhere. He shits on the floor at night if he's inside,\nso usually we put him in the garage. He prefers it anyway.";
     },
     options: w => [
-      { key:"garage",   label:"Garage. He prefers it. You prefer it." },
-      { key:"house",    label:"House. He's been good lately. (Has he?)" },
-      { key:"bedroom",  label:"Bedroom floor. Compromise. New experiment." },
-      { key:"late_out", label:"One more trip outside, then decide." },
+      { key:"garage",   label:"Garage. (His preference, our preference.)" },
+      { key:"house",    label:"House. He's been good lately." },
+      { key:"bedroom",  label:"Bedroom floor." },
+      { key:"late_out", label:"Take him out one more time first." },
     ],
     resolve: (w, k) => {
-      if (k === "garage")   { w.sleep_location = "garage"; return { narration: "Garage. He pads in without protest, finds the kiddie pool, settles.\nThe morning will be uneventful. The morning will be clean.", next:["debrief"] }; }
-      if (k === "house")    { w.sleep_location = "house"; w.score.comedies_endured++; return { narration: "House. He looks pleased. You will pay for this in the morning.\nThe carpet has seen worse. It will see worse again.", next:["debrief"] }; }
-      if (k === "bedroom")  { w.sleep_location = "house"; return { narration: "Bedroom floor. He circles three times, lies down, and immediately\nbegins to snore — a sound out of scale with his body. You are awake now.\nYou will be awake at 4:12. You will know it was 4:12.", next:["debrief"] }; }
-      if (k === "late_out") { return { narration: "One more trip. He pees with conviction. Returns. Looks at you,\nawaiting a verdict. The verdict is still pending.", next:["nighttime_choice"] }; }
+      if (k === "garage")   { w.sleep_location = "garage"; return { narration: "Garage. He went in without complaining. Morning will be clean.", next:["debrief"] }; }
+      if (k === "house")    { w.sleep_location = "house"; w.score.comedies_endured++; return { narration: "House. He looked pleased. I'll regret it tomorrow.", next:["debrief"] }; }
+      if (k === "bedroom")  { w.sleep_location = "house"; return { narration: "Bedroom floor. He circled three times and started snoring loud enough to wake me up at 4 AM.", next:["debrief"] }; }
+      if (k === "late_out") { return { narration: "One more trip out. He peed. Came back. Now what.", next:["nighttime_choice"] }; }
     },
   },
 
   attila_bed_petting: {
     title: "BED-PETTING (B013)",
-    intro: w => "BED — STILL AFTERNOON\n\nAttila is on the bed. He is allowed. He is also large.\nHe is currently being petted. He requires this to continue.\nIf you stop, a paw will appear. The paw is the size of your hand.",
+    intro: w => "Attila's on the bed. He's allowed.\nHe'll only stay if I keep petting him. If I stop, he paws me.\nThe paw is huge.",
     options: w => [
-      { key:"continue", label:"Keep petting. Forever, if necessary." },
-      { key:"stop",     label:"Stop petting. Wait for the paw." },
-      { key:"down",     label:"Tell him 'down.' (May require multiple commands.)" },
-      { key:"share",    label:"Pet with one hand, work with the other." },
+      { key:"continue", label:"Keep petting." },
+      { key:"stop",     label:"Stop and see what happens." },
+      { key:"down",     label:"Tell him down." },
+      { key:"share",    label:"Pet with one hand, do something else with the other." },
     ],
     resolve: (w, k) => {
-      if (k === "continue") { w.score.comedies_endured++; return { narration: "You keep petting. Attila's eyes close. Time becomes negotiable.\nYou will get nothing else done today. This may be fine.", next:["bed_destruction_flashback"] }; }
+      if (k === "continue") { w.score.comedies_endured++; return { narration: "I kept petting. He closed his eyes. I got nothing else done.", next:["bed_destruction_flashback"] }; }
       if (k === "stop") {
-        return { narration: "You stop. One second. Two. Three. The paw appears, lands on your chest\nwith all the gravity of a customs inspection. The terms are clear. You\nresume.", next:["attila_bed_petting"] };
+        return { narration: "I stopped. Three seconds later the paw landed on my chest. I started petting again.", next:["attila_bed_petting"] };
       }
-      if (k === "down") { w.score.comedies_endured++; return { narration: "You tell him down. He looks at you. You tell him again, firmer.\nHe sighs the sigh of a misunderstood collaborator and, on the third\ncommand, jumps down. He gives you a long look from the floor.\nYou will pet him later. He knows. You know.", next:["bed_face_lick"] }; }
-      if (k === "share")    return { narration: "You compromise. Left hand pets. Right hand works. Neither side fully\nsatisfied. This is the marriage, this is the management, this is the case.", next:["bed_destruction_flashback"] };
+      if (k === "down") { w.score.comedies_endured++; return { narration: "I told him down. He looked at me. I said it again. And again. He got down on the third one.", next:["bed_face_lick"] }; }
+      if (k === "share")    return { narration: "I petted with one hand and worked with the other. Neither side was satisfied.", next:["bed_destruction_flashback"] };
     },
   },
 
   tennis_ball: {
     title: "THE TENNIS BALL (B014)",
-    intro: w => "THE YARD — MID-AFTERNOON\n\nYou hold a tennis ball. You found it in a drawer. It is, somehow,\nnew. The dogs have gathered. You feel a flicker of hope. You should\nnot. You know you should not. You feel it anyway.",
+    intro: w => "I found a tennis ball in a drawer. None of these dogs care about balls.\nI had a border collie named Dalamar in my 20s who was obsessed with the ball.",
     options: w => [
-      { key:"throw",    label:"Throw the ball. (Hope.)" },
-      { key:"roll",     label:"Roll it gently. Lower the bar." },
-      { key:"squeeze",  label:"Squeeze it. Remind yourself it squeaks. (It doesn't.)" },
-      { key:"dalamar",  label:"Pocket the ball. Remember Dalamar instead." },
+      { key:"throw",    label:"Throw it anyway." },
+      { key:"roll",     label:"Roll it gently." },
+      { key:"squeeze",  label:"Squeeze it (it doesn't squeak)." },
+      { key:"dalamar",  label:"Pocket it. Remember Dalamar." },
     ],
     resolve: (w, k) => {
-      if (k === "throw") { w.score.comedies_endured++; return { narration: "You throw. The ball arcs, lands. Okie watches it go. Tex blinks at the\nball. Attila is busy elsewhere. Crockett is asleep.\n\n[A memory cuts in: a border collie named Dalamar, in another yard, who\nwould have been on it before it landed. The memory passes. The ball remains\nin the grass.]", next:["dog_park"] }; }
-      if (k === "roll")  return { narration: "You roll it. Okie pats it once with his paw, then loses interest.\nThe ball comes to rest against the dirt strip. The blueberry bush\n(or its memorial) registers no opinion.", next:["dog_park"] };
-      if (k === "squeeze") { w.score.comedies_endured++; return { narration: "You squeeze. Nothing happens. You squeeze harder. Still nothing.\nThe dogs look at you with mild, polite concern. You put the ball away.", next:["dog_park"] }; }
-      if (k === "dalamar") return { narration: "You pocket the ball. Dalamar's image arrives unbidden — the slim black-and-white\nshape, the obsessive eye-line. He would have ruined this ball within a week.\nThese dogs will not. It is its own kind of peace.", next:["dog_park"] };
+      if (k === "throw") { w.score.comedies_endured++; return { narration: "I threw it. Okie watched it go. Tex blinked at it. Attila didn't notice. Crockett was asleep.", next:["dog_park"] }; }
+      if (k === "roll")  return { narration: "I rolled it. Okie patted it once with his paw and lost interest.", next:["dog_park"] };
+      if (k === "squeeze") { w.score.comedies_endured++; return { narration: "I squeezed it. Nothing. The dogs looked at me. I put the ball away.", next:["dog_park"] }; }
+      if (k === "dalamar") return { narration: "I put it back in my pocket. Dalamar would have ruined this ball in a week. These dogs won't.", next:["dog_park"] };
     },
   },
 
   dog_park: {
     title: "THE DOG PARK (B015)",
-    intro: w => "MIDDAY — THE PARK\n\nThe gate clicks shut behind you. Something changes in the dogs.\nOkie's stance shifts. Tex is already moving. Attila surveys, the\ndignified senior officer surveying the platoon. Crockett picks his spot.\n\nThis is what works. Open space. New dogs. The yard is a stage; the park\nis a country.",
+    intro: w => "At the dog park. The minute we get past the gate, all four of them actually run around.\nThe yard doesn't do this for them.",
     options: w => [
-      { key:"unleash",   label:"Off-leash. Let them run." },
-      { key:"close",     label:"Keep them close. Suburban liability brain." },
-      { key:"observe",   label:"Sit on the bench. Watch the social calculus." },
-      { key:"home_now",  label:"It was enough. Head home." },
+      { key:"unleash",   label:"Let them off-leash." },
+      { key:"close",     label:"Keep them on leash." },
+      { key:"observe",   label:"Sit on the bench and watch." },
+      { key:"home_now",  label:"Head home." },
     ],
     resolve: (w, k) => {
-      if (k === "unleash") { w.okie_anxiety = Math.max(0, w.okie_anxiety - 3); return { narration: "Off they go. Okie sprints in a wide arc, the anxiety burning off in real time.\nTex follows, slower, herding the herder. Attila takes the long perimeter. Crockett\nstays near you, supervising. The park does its work. Your dog improves measurably.", next:["bed_face_lick"] }; }
-      if (k === "close")    { w.okie_anxiety = Math.max(0, w.okie_anxiety - 1); return { narration: "Leashes on. The dogs look at you. The look is not flattering. They walk a circuit.\nThe anxiety leaves slowly, in small reluctant amounts.", next:["bed_face_lick"] }; }
-      if (k === "observe")  { w.score.comedies_endured++; return { narration: "Bench. Coffee that you forgot to bring. A retriever introduces itself to Attila;\nAttila is unbothered. A small dog harasses Crockett; Crockett ignores it like an\nold judge. Okie befriends nobody. Tex befriends everyone.", next:["bed_face_lick"] }; }
-      if (k === "home_now") return { narration: "You leash up. The dogs go willingly, surprising you. Sometimes the park is a\nfifteen-minute event, and that's the right length. You drive home in the kind\nof silence that doesn't need filling.", next:["bed_face_lick"] };
+      if (k === "unleash") { w.okie_anxiety = Math.max(0, w.okie_anxiety - 3); return { narration: "I let them off. Okie ran in big circles. Tex followed him. Attila walked the perimeter. Crockett stayed near me. Okie's anxiety dropped a lot.", next:["bed_face_lick"] }; }
+      if (k === "close")    { w.okie_anxiety = Math.max(0, w.okie_anxiety - 1); return { narration: "Leashes stayed on. We walked a circuit. Less effective but easier.", next:["bed_face_lick"] }; }
+      if (k === "observe")  { w.score.comedies_endured++; return { narration: "I sat on the bench. A retriever came up to Attila. Attila didn't care. A small dog harassed Crockett. Crockett ignored it.", next:["bed_face_lick"] }; }
+      if (k === "home_now") return { narration: "I leashed them and we left. Sometimes the park is a 15-minute thing.", next:["bed_face_lick"] };
     },
   },
 
   four_dog_bed_session: {
     title: "FOUR-DOG BED SESSION (B011)",
-    intro: w => "EVENING — THE BEDROOM\n\nYou pat the comforter and say the magic words. The Aussies, usually banished,\nlook suspicious. Attila bounds up first, settles like a soft anvil. Crockett\ntakes several attempts but makes it. Okie hesitates, then commits. Tex, last,\narranges himself across your shins.\n\nFour dogs. One bed. Some movie playing. This happens about once a month.",
+    intro: w => "Once a month we let all four dogs on the bed and watch a movie.\nAttila got up first. Then Crockett (we had to help). Then Okie. Then Tex, across my shins.",
     options: w => [
-      { key:"hold",     label:"Hold the equilibrium. Pet what you can reach." },
-      { key:"laugh",    label:"Laugh out loud at how absurd the bed has become." },
-      { key:"document", label:"Take a photo nobody else will ever see." },
-      { key:"end",      label:"Twenty minutes is enough. Send them off." },
+      { key:"hold",     label:"Just stay there and pet whichever one I can reach." },
+      { key:"laugh",    label:"Laugh at how ridiculous the bed has become." },
+      { key:"document", label:"Take a photo." },
+      { key:"end",      label:"Twenty minutes is enough. Get them off." },
     ],
     resolve: (w, k) => {
-      if (k === "hold")     { w.okie_anxiety = Math.max(0, w.okie_anxiety - 2); w.score.comedies_endured++; return { narration: "You hold the line. A hand on Attila, a foot near Tex, an elbow grazing Crockett,\nOkie's chin somewhere on your forearm. The movie plays. Nobody is watching.\nThis is the warm one. The one the case file forgets to mention.", next:["nighttime_choice"] }; }
-      if (k === "laugh")    { w.score.comedies_endured++; return { narration: "You laugh. Attila's ear twitches. Tex's tail thumps once. Crockett opens\none eye, closes it. Okie looks at you with the gentle disappointment of a\ndog who thought you were taking this seriously.", next:["nighttime_choice"] }; }
-      if (k === "document") { w.score.comedies_endured++; return { narration: "Phone. Aim. Attila's belly fills the foreground; the others are blurs of fur.\nThe photo is unusable. You keep it anyway. It's the keeping that matters.", next:["nighttime_choice"] }; }
-      if (k === "end")      return { narration: "Up. Off. The Aussies go quickly — they know the rule. Attila lingers.\nCrockett accepts the help to get down. The bed is yours again. It feels too big.", next:["nighttime_choice"] };
+      if (k === "hold")     { w.okie_anxiety = Math.max(0, w.okie_anxiety - 2); w.score.comedies_endured++; return { narration: "I stayed there. Hand on Attila, foot near Tex, elbow on Crockett, Okie's chin on my arm. The movie played. Nobody watched it.", next:["nighttime_choice"] }; }
+      if (k === "laugh")    { w.score.comedies_endured++; return { narration: "I laughed. Attila's ear twitched. Tex's tail thumped once. Crockett opened one eye.", next:["nighttime_choice"] }; }
+      if (k === "document") { w.score.comedies_endured++; return { narration: "I took a picture. Attila's belly filled most of the frame. The photo is unusable but I kept it.", next:["nighttime_choice"] }; }
+      if (k === "end")      return { narration: "I got them off. The Aussies went right away — they know the rule. Attila took longer. Crockett needed help getting down.", next:["nighttime_choice"] };
     },
   },
 
   gate_escape: {
     title: "THE GATE WAS OPEN (B016)",
-    intro: w => "[INCIDENT]\n\nYou notice the yard is quiet. Too quiet. The gate swings in the breeze.\nA quick count: Attila, present. Crockett, present. Tex — Tex is missing.\nOkie is missing.\n\nAcross the suburb, somewhere, two Aussies are introducing themselves\nto a neighborhood you had hoped to keep them out of.",
+    intro: w => "The yard is quiet. The gate is open.\nAttila and Crockett are here. Tex and Okie are gone.\nI have to go look for them.",
     options: w => [
-      { key:"left",   label:"Search left — toward the cul-de-sac." },
-      { key:"right",  label:"Search right — toward the main road." },
-      { key:"call",   label:"Call a neighbor. Get coverage." },
-      { key:"drive",  label:"Get in the car. Cover ground." },
-      { key:"panic",  label:"Stand in the driveway. Process the situation." },
+      { key:"left",   label:"Go left, toward the cul-de-sac." },
+      { key:"right",  label:"Go right, toward the main road." },
+      { key:"call",   label:"Call a neighbor for help first." },
+      { key:"drive",  label:"Get in the car." },
+      { key:"panic",  label:"Stand in the driveway for a second." },
     ],
     resolve: (w, k) => {
-      if (k === "left") return { narration: "You head left. Two blocks in, a neighbor is holding Tex by the collar.\n\"He's a sweetheart,\" she says, in a tone that suggests he is also a problem.\nYou thank her. You take Tex. One down. One to go.", next:["gate_escape_part2"] };
-      if (k === "right") { w.score.neighbors_owed_money = (w.score.neighbors_owed_money || 0) + 200; return { narration: "You head right. Three blocks in, a pregnant woman is standing in her front\nyard holding a baby in one arm and pointing with the other. Her dog, she says,\nwas bitten. Her husband — a cop — would like a word.\n\n[$200 changes hands. The receipt is verbal. You will remember the verbal receipt.]", next:["gate_escape_part2"] }; }
-      if (k === "call")  return { narration: "You call your neighbor. He's already seen them — Tex caught up the cul-de-sac,\nOkie heading toward the main road. He'll grab Tex. You go for Okie. The next ten\nminutes are the longest of the week.", next:["gate_escape_part2"] };
-      if (k === "drive") return { narration: "You get in the car. Wide loop, slow. You spot Tex first, on a porch, befriending\na cat. The cat looks displeased. You collect Tex. Okie is harder; you find him\ntwo streets over, looking lost in a way you cannot bear.", next:["gate_escape_part2"] };
-      if (k === "panic") { w.score.comedies_endured += 2; return { narration: "You stand in the driveway. Forty-five seconds pass. The driveway, helpfully,\noffers nothing. You begin to move. The forty-five seconds were not free.\nYou will think about them later, around 3 AM.", next:["gate_escape_part2"] }; }
+      if (k === "left") return { narration: "I went left. Two blocks in, a neighbor was holding Tex by the collar. I thanked her. One down. One to go.", next:["gate_escape_part2"] };
+      if (k === "right") { w.score.neighbors_owed_money = (w.score.neighbors_owed_money || 0) + 200; return { narration: "I went right. Three blocks in, a pregnant lady was standing in her front yard holding her baby. Her dog had been bitten by Okie, she said. Her husband, a cop, came out and shook me down for $200 cash for a vet bill. I paid.", next:["gate_escape_part2"] }; }
+      if (k === "call")  return { narration: "I called my neighbor. He'd already seen them — Tex up the cul-de-sac, Okie heading toward the main road. He went for Tex. I went for Okie.", next:["gate_escape_part2"] };
+      if (k === "drive") return { narration: "I got in the car and drove a slow loop. Found Tex on a porch annoying a cat. Found Okie two streets over.", next:["gate_escape_part2"] };
+      if (k === "panic") { w.score.comedies_endured += 2; return { narration: "I stood in the driveway for forty-five seconds before I could move. I'd think about those forty-five seconds later.", next:["gate_escape_part2"] }; }
     },
   },
 
   gate_escape_part2: {
     title: "THE GATE — RECOVERY",
-    intro: w => "Both dogs accounted for. You walk them home. The gate is closed and bolted\nbehind you. The bolt is checked twice. A third time. The case file gets a new\npage: HOW THE GATE WAS LEFT OPEN. The page is blank. You suspect you know.",
+    intro: w => "Both dogs are home. The gate is bolted. I checked it three times.",
     options: w => [
-      { key:"check",   label:"Check the gate latch. Diagnose." },
-      { key:"blame",   label:"Examine the events. Apportion blame." },
-      { key:"forgive", label:"Forgive yourself. Move on." },
+      { key:"check",   label:"Check the latch." },
+      { key:"blame",   label:"Try to figure out who left it open." },
+      { key:"forgive", label:"Let it go." },
     ],
     resolve: (w, k) => {
-      if (k === "check")   return { narration: "The latch works. The latch was always going to work. You did not throw it.\nThis is the entire mystery, and the answer is unsatisfying.", next:["debrief"] };
-      if (k === "blame")   return { narration: "You apportion blame across yourself, the dogs, the trash collector who may\nhave left it ajar, and the wind. The pie chart resolves to: you. Mostly you.", next:["debrief"] };
-      if (k === "forgive") { w.score.comedies_endured++; return { narration: "You let it go. The case file is, after all, just a file. The dogs are home.\nThe bush is dead but it was already dead. The cop has his money. Tomorrow\nis a new gate.", next:["debrief"] }; }
+      if (k === "check")   return { narration: "The latch works. It was me. I left it open.", next:["debrief"] };
+      if (k === "blame")   return { narration: "Probably me. Maybe the trash guy. Probably me.", next:["debrief"] };
+      if (k === "forgive") { w.score.comedies_endured++; return { narration: "I let it go. The dogs are home.", next:["debrief"] }; }
     },
   },
 
   debrief: {
     title: "DEBRIEF",
     intro: w => {
-      // Score-aware opening: changes based on what actually happened.
-      let mood;
-      const k = w.score.bushes_dead, c = w.score.comedies_endured, owe = w.score.neighbors_owed_money || 0;
-      if (k > 0 && owe > 0)       mood = "It was the kind of day that gets a paragraph in the report and a sigh from the partner.";
-      else if (k > 0)             mood = "It was the kind of day where the bush, on balance, lost.";
-      else if (owe > 0)           mood = "It was the kind of day where the wallet did the heavy lifting.";
-      else if (c >= 3)            mood = "It was the kind of day that produced no incidents and several small humiliations.";
-      else if (w.bone_cache >= 3) mood = "It was the kind of day that made Okie a richer dog and you a poorer planner.";
-      else                        mood = "It was the kind of day that hardly made the file.";
-      return "─── END OF SESSION ───\n\n" + mood + "\nYou sit at the kitchen table and tally what happened.";
+      const e = classifyEnding(w);
+      return "─── END OF DAY: " + e.tag + " ───\n\n" + e.opening;
     },
     options: w => [
-      { key:"accept_score", label:"Accept the score. Walk away." },
+      { key:"accept_score", label:"Done." },
     ],
     resolve: (w, k) => {
+      const e = classifyEnding(w);
       const owed = w.score.neighbors_owed_money || 0;
       const bushLine = w.score.bushes_dead > 0
-        ? "  The blueberry bush, formerly of this address: deceased.\n"
-        : "  The blueberry bush is still alive. Today.\n";
-      const oweLine = owed > 0 ? "  Neighbors owed:                $" + owed + "\n" : "";
-      const codaIfWarm = (w.score.comedies_endured >= 2 && w.score.bushes_dead === 0 && owed === 0)
-        ? "\n  A small good day. They are scarce. You earned this one."
-        : "\n  You set the case down. The dogs continue without you. They always do.";
+        ? "Bush: dead.\n"
+        : "Bush: still alive.\n";
+      const oweLine = owed > 0 ? "Owed: $" + owed + "\n" : "";
       return {
         narration:
           bushLine +
-          "  Bones banked (Okie's vault):   " + w.bone_cache + "\n" +
-          "  Comedies endured:              " + w.score.comedies_endured + "\n" +
+          "Bones banked: " + w.bone_cache + "\n" +
+          "Comedies endured: " + w.score.comedies_endured + "\n" +
           oweLine +
-          "  Anxiety, final:                " + w.okie_anxiety + "/10" +
-          codaIfWarm,
+          "Anxiety, final: " + w.okie_anxiety + "/10\n\n" +
+          e.closer,
         end_case: true
       };
     },
