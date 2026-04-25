@@ -6,6 +6,8 @@
 
 Okie asks to be let into the garage specifically to **stash rawhide bones** under the blankets of the kiddie-pool dog beds. Bones come in 12–20 count packs, Old Roy brand from Walmart. He is the designated bone banker of the household.
 
+**Sophistication noted (2026-04-25):** Okie deliberately *upsets the blankets* — pawing them up and rearranging the folds — to make the cache space better. This is a problem-solving / planning behavior, not just instinctive caching. He is preparing the hide.
+
 ## Trigger
 
 Okie possesses a bone + garage is accessible + `anxiety` or `hoarding` drive above threshold.
