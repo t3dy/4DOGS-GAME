@@ -1,0 +1,51 @@
+
+  ==== DOGSGAME v1 — A morning in Sultan, WA ====
+
+  Okie steps off the patio. The blueberry bush is in sight.
+
+  H H H H H G 
+  P P P P O D 
+  . . . . D D 
+  , B , T , D 
+  ~ ~ x ~ F F 
+
+  Bush: alive
+  He picks his way down to the dirt strip and stops at the bush.
+
+  H H H H H G 
+  P P P P P D 
+  . . . . D D 
+  , O , T , D 
+  ~ ~ x ~ F F 
+
+  Bush: alive
+  Okie lifts a leg. The bush is now yellowing.
+
+  H H H H H G 
+  P P P P P D 
+  . . . . D D 
+  , O , T , D 
+  ~ ~ x ~ F F 
+
+  Bush: yellowing
+  Okie lifts a leg. The bush is now wilting.
+
+  H H H H H G 
+  P P P P P D 
+  . . . . D D 
+  , O , T , D 
+  ~ ~ x ~ F F 
+
+  Bush: wilting
+  Okie lifts a leg. The blueberry bush dies. He shows no remorse.
+
+  H H H H H G 
+  P P P P P D 
+  . . . . D D 
+  , O , T , D 
+  ~ ~ x ~ F F 
+
+  Bush: DEAD
+
+  ==== END ====
+  Logged 1 event to data\dogsim.db  (total rows: 1)
