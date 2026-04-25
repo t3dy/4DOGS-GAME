@@ -297,6 +297,8 @@ const initialWorld = () => ({
   score: { bushes_dead: 0, comedies_endured: 0 },
   case_id: "",
   flashback_fired: false,   // anxiety-triggered flashback is one-shot per run
+  cache_quality: 0,         // 0-3, raised by prepare_blanket; affects inspect/visibility
+  crockett_episodes: 0,     // count of sundowning episodes this run
 });
 let world = initialWorld();
 let queue = [];
@@ -500,12 +502,20 @@ const ENCOUNTERS = {
 
   garage_bone_pack: {
     title: "THE BONE BANK (B005)",
-    intro: w => "In the garage. There's an open Old Roy bag — " + w.bones_in_pack + " rawhides left.\nOkie's cache under the kiddie-pool bed blanket is at " + w.bone_cache + ".",
+    intro: w => {
+      const blanketState = ["smooth", "rumpled", "well-rumpled", "thoroughly worked over"][w.cache_quality];
+      return "In the garage. Open Old Roy bag — " + w.bones_in_pack + " rawhides left.\n" +
+        "Cache under the kiddie-pool blanket: " + w.bone_cache + ".\n" +
+        "The blanket is " + blanketState + ". Okie's been here.";
+    },
     options: w => {
       const opts = [];
       if (w.bones_in_pack > 0) {
         opts.push({ key:"hand_one", label:"Give Okie one bone." });
         if (w.bones_in_pack >= 3) opts.push({ key:"hand_three", label:"Give him three." });
+      }
+      if (w.cache_quality < 3) {
+        opts.push({ key:"prepare_blanket", label:"Watch Okie paw the blanket up first." });
       }
       opts.push({ key:"inspect",  label:"Lift the blanket and look at the stash." });
       opts.push({ key:"close_bag", label:"Close the bag." });
@@ -514,13 +524,28 @@ const ENCOUNTERS = {
     resolve: (w, k) => {
       if (k === "hand_one") {
         w.bones_in_pack--; w.bone_cache++;
-        return { narration: "I gave him a bone. He took it to the kiddie pool, lifted the blanket with his nose, and put it under. Cache: " + w.bone_cache + ".", next:["garage_bone_pack"] };
+        return { narration: "I gave him a bone. He took it to the kiddie pool, lifted the blanket with his nose, put it under. Cache: " + w.bone_cache + ".", next:["garage_bone_pack"] };
       }
       if (k === "hand_three") {
         const took = Math.min(3, w.bones_in_pack); w.bones_in_pack -= took; w.bone_cache += took;
         return { narration: "Three bones, three trips. Cache is at " + w.bone_cache + " now.", next:["garage_okie_anxious"] };
       }
-      if (k === "inspect") return { narration: "I lifted the blanket. " + w.bone_cache + " bones under there. Okie watched me from the door. I put the blanket back.", next:["garage_bone_pack"] };
+      if (k === "prepare_blanket") {
+        w.cache_quality = Math.min(3, w.cache_quality + 1);
+        const lines = [
+          "Okie pawed at the blanket and folded it back. He's making the spot better before he uses it.",
+          "He worked the blanket some more. He's careful about this.",
+          "Another round of pawing. The blanket is well-arranged now.",
+        ];
+        return { narration: lines[w.cache_quality - 1] || lines[2], next:["garage_bone_pack"] };
+      }
+      if (k === "inspect") {
+        let line;
+        if (w.cache_quality === 0) line = "I lifted the blanket. The bones are right there. " + w.bone_cache + " of them.";
+        else if (w.cache_quality < 3) line = "I lifted the blanket. Found the bones after a second. " + w.bone_cache + " under there.";
+        else line = "I lifted the blanket. Took me a minute. " + w.bone_cache + " bones, tucked in.";
+        return { narration: line + " Okie watched from the door. I put the blanket back.", next:["garage_bone_pack"] };
+      }
       if (k === "close_bag") return { narration: "I closed the bag. " + w.bones_in_pack + " left in reserve.", next:["garage_okie_anxious"] };
     },
   },
@@ -654,6 +679,24 @@ const ENCOUNTERS = {
     },
   },
 
+  crockett_sundowning: {
+    title: "CROCKETT, 2 AM (B-CROCKETT)",
+    intro: w => "I woke up around 2. Crockett's standing in the hallway looking at the wall.\nHe's 11. He shakes a little. Sometimes he doesn't seem to know what he was doing.",
+    options: w => [
+      { key:"lead_back", label:"Lead him back to his bed." },
+      { key:"sit_with",  label:"Sit on the floor with him for a minute." },
+      { key:"water",     label:"Take him to his water bowl." },
+      { key:"leave_be",  label:"Leave him. He'll figure it out." },
+    ],
+    resolve: (w, k) => {
+      w.crockett_episodes = (w.crockett_episodes || 0) + 1;
+      if (k === "lead_back") return { narration: "I walked him back. He followed me. He laid down. I went back to bed.", next:["debrief"] };
+      if (k === "sit_with")  { w.score.comedies_endured++; return { narration: "I sat down on the floor next to him. He stood there for a while, then he sat down too. After a few minutes he leaned against me. We stayed there for a bit.", next:["debrief"] }; }
+      if (k === "water")     return { narration: "I took him to his bowl. He drank some water. Then he stood there looking at the bowl. Then he turned and went to his bed on his own.", next:["debrief"] };
+      if (k === "leave_be")  return { narration: "I went back to bed. I heard him moving around for a while. By the time I fell asleep again he was quiet.", next:["debrief"] };
+    },
+  },
+
   nighttime_choice: {
     title: "NIGHTTIME — WHERE DOES OKIE SLEEP (B008)",
     intro: w => {
@@ -670,9 +713,9 @@ const ENCOUNTERS = {
       { key:"late_out", label:"Take him out one more time first." },
     ],
     resolve: (w, k) => {
-      if (k === "garage")   { w.sleep_location = "garage"; return { narration: "Garage. He went in without complaining. Morning will be clean.", next:["debrief"] }; }
-      if (k === "house")    { w.sleep_location = "house"; w.score.comedies_endured++; return { narration: "House. He looked pleased. I'll regret it tomorrow.", next:["debrief"] }; }
-      if (k === "bedroom")  { w.sleep_location = "house"; return { narration: "Bedroom floor. He circled three times and started snoring loud enough to wake me up at 4 AM.", next:["debrief"] }; }
+      if (k === "garage")   { w.sleep_location = "garage"; return { narration: "Garage. He went in without complaining. Morning will be clean.", next:["crockett_sundowning"] }; }
+      if (k === "house")    { w.sleep_location = "house"; w.score.comedies_endured++; return { narration: "House. He looked pleased. I'll regret it tomorrow.", next:["crockett_sundowning"] }; }
+      if (k === "bedroom")  { w.sleep_location = "house"; return { narration: "Bedroom floor. He circled three times and started snoring loud enough to wake me up at 4 AM.", next:["crockett_sundowning"] }; }
       if (k === "late_out") { return { narration: "One more trip out. He peed. Came back. Now what.", next:["nighttime_choice"] }; }
     },
   },
@@ -836,6 +879,7 @@ const SCENE_INDEX = [
   ["nighttime_choice",         "B008 — Where Does Okie Sleep"],
   ["gate_escape",              "B016 — The Gate Was Open"],
   ["gate_escape_part2",        "B016b — Recovery"],
+  ["crockett_sundowning",      "B-Crockett — 2 AM"],
   ["debrief",                  "DEBRIEF"],
 ];
 
@@ -844,12 +888,12 @@ const CASES = {
     opening:"CASE FILE — A MORNING IN SULTAN, WA\nSubject: Okie. (Aussie. Anxious. Bone-banker. Suspect.)\nDetective: you, again.\nCoffee: cold.",
     seed:["morning_briefing"] },
   full_day: { title:"FULL DAY — ALL SCENES",
-    opening:"CASE FILE — FULL DAY\nFrom morning briefing through nighttime sleep assignment, by way\nof the bush, the bones, the pig, the leash, the park, the ball,\nthe bed, the flashback, the bed-session, and the gate that was open.\nA complete pass through every scene in the file.",
+    opening:"CASE FILE — FULL DAY\nFrom morning briefing through nighttime, including a 2 AM check-in with Crockett.\nA complete pass through every scene in the file.",
     seed:["morning_briefing","yard_bush","yard_passerby","tex_belly_roll",
           "garage_bone_pack","garage_okie_anxious","squeak_steal","attila_whine",
           "dog_park","tennis_ball","bed_face_lick","attila_bed_petting",
           "bed_destruction_flashback","four_dog_bed_session","gate_escape",
-          "nighttime_choice","debrief"] },
+          "nighttime_choice","crockett_sundowning","debrief"] },
   long: { title:"CASE 2: A LONGER MORNING",
     opening:"CASE FILE — A LONGER MORNING\nSubject: All four dogs, in sequence.\nBriefing: Yard. Bones. A pig. A leash. A bedroom.\nTime budget: until you stop.",
     seed:["morning_briefing", "yard_bush", "squeak_steal", "garage_bone_pack", "attila_whine", "bed_face_lick", "debrief"] },
