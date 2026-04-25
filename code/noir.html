@@ -35,9 +35,13 @@
 
   .layout {
     display: grid;
-    grid-template-columns: 1fr 240px;
+    grid-template-columns: 1fr 260px;
     gap: 0;
     min-height: calc(100vh - 56px);
+  }
+  @media (max-width: 720px) {
+    .layout { grid-template-columns: 1fr; }
+    aside { border-left: none !important; border-top: 1px solid var(--ink-dimmer); }
   }
   main {
     padding: 24px 32px;
@@ -49,6 +53,18 @@
     padding: 20px 18px;
     font-size: 12px;
     color: var(--ink-dim);
+  }
+  .progress-badge {
+    float: right;
+    font-size: 10px; letter-spacing: 2px;
+    color: var(--ink-dim);
+    background: #000; padding: 2px 6px;
+    border: 1px solid var(--ink-dimmer);
+  }
+  .key-hint {
+    color: var(--ink-dimmer); font-size: 11px;
+    text-align: right; margin-top: 6px;
+    font-style: italic;
   }
 
   /* Title + opening */
@@ -76,8 +92,14 @@
     white-space: pre-wrap; color: var(--ink); margin-bottom: 12px;
   }
   .enc-resolution {
-    white-space: pre-wrap; color: var(--ink); margin: 12px 0 8px;
-    padding: 8px 12px; background: #000; border-left: 2px solid var(--red);
+    white-space: pre-wrap; color: #fff; margin: 12px 0 8px;
+    padding: 12px 14px; background: #000; border-left: 3px solid var(--red);
+    font-weight: normal; position: relative;
+  }
+  .enc-resolution::before {
+    content: "→ OUTCOME";
+    display: block; color: var(--red); font-size: 9px; letter-spacing: 3px;
+    margin-bottom: 6px; opacity: 0.7;
   }
   .enc-resolution .red { color: var(--red); }
 
@@ -202,6 +224,9 @@
       <button onclick="warpFromInput()" style="background:#000; color:var(--red); border:1px solid var(--red);
               padding:4px 10px; font-family:inherit; font-size:11px; cursor:pointer; letter-spacing:1px;">GO</button>
     </div>
+    <button onclick="resetWorldOnly()" style="width:100%; background:#000; color:var(--ink-dim);
+            border:1px solid var(--ink-dimmer); padding:6px; font-family:inherit; font-size:11px;
+            cursor:pointer; letter-spacing:1px; margin-bottom:6px;">↻ RESET WORLD STATE</button>
     <details style="font-size:11px;">
       <summary style="cursor:pointer; color:var(--ink-dim); padding:4px 0;">▸ Scene index</summary>
       <div id="sceneIndexList" style="padding:6px 0; line-height:1.4; color:var(--ink-dim);"></div>
@@ -424,7 +449,17 @@ const ENCOUNTERS = {
 
   bed_face_lick: {
     title: "FACE-LICK (B012)",
-    intro: w => "THE BEDROOM, AFTERNOON\n\nYou lie down. Not to sleep — to stop. Okie pads in.\nConsiders. Joins. He is too close to your face. He is professional about it.\nThe tongue is loaded.",
+    intro: w => {
+      const ghost = w.score.bushes_dead > 0
+        ? "Through the window you can see the dirt strip. The bush is not there.\nIt is and isn't there. Anyway.\n\n"
+        : "";
+      const anxious = w.okie_anxiety >= 6
+        ? "Okie is wound tight today — he leans into you with the weight of someone\nwho has been pacing for an hour.\n"
+        : "";
+      return "THE BEDROOM, AFTERNOON\n\n" + ghost +
+        "You lie down. Not to sleep — to stop. Okie pads in.\nConsiders. Joins. He is too close to your face. He is professional about it.\n" + anxious +
+        "The tongue is loaded.";
+    },
     options: w => {
       const scoopLabel = ({0:"today", 1:"yesterday"})[w.scoop_days_ago] || "I don't want to talk about it";
       return [
@@ -486,7 +521,13 @@ const ENCOUNTERS = {
 
   nighttime_choice: {
     title: "NIGHTTIME — WHERE DOES OKIE SLEEP (B008)",
-    intro: w => "10:47 PM\n\nThe dishwasher rumbles. The dogs are in their stations.\nThe question, every night: where does Okie sleep.\nThe history is not on his side. Neither is the carpet.",
+    intro: w => {
+      const bushNote = w.score.bushes_dead > 0
+        ? "Outside, in the dirt strip, the blueberry bush is finishing\nits second day of being dead. The yard does not feel different,\nwhich is somehow worse.\n\n"
+        : "";
+      return "10:47 PM\n\n" + bushNote +
+        "The dishwasher rumbles. The dogs are in their stations.\nThe question, every night: where does Okie sleep.\nThe history is not on his side. Neither is the carpet.";
+    },
     options: w => [
       { key:"garage",   label:"Garage. He prefers it. You prefer it." },
       { key:"house",    label:"House. He's been good lately. (Has he?)" },
@@ -607,18 +648,38 @@ const ENCOUNTERS = {
 
   debrief: {
     title: "DEBRIEF",
-    intro: w => "─── END OF SESSION ───\n\nThe case file is closed for the day. You sit at the kitchen table\nand tally what happened.",
+    intro: w => {
+      // Score-aware opening: changes based on what actually happened.
+      let mood;
+      const k = w.score.bushes_dead, c = w.score.comedies_endured, owe = w.score.neighbors_owed_money || 0;
+      if (k > 0 && owe > 0)       mood = "It was the kind of day that gets a paragraph in the report and a sigh from the partner.";
+      else if (k > 0)             mood = "It was the kind of day where the bush, on balance, lost.";
+      else if (owe > 0)           mood = "It was the kind of day where the wallet did the heavy lifting.";
+      else if (c >= 3)            mood = "It was the kind of day that produced no incidents and several small humiliations.";
+      else if (w.bone_cache >= 3) mood = "It was the kind of day that made Okie a richer dog and you a poorer planner.";
+      else                        mood = "It was the kind of day that hardly made the file.";
+      return "─── END OF SESSION ───\n\n" + mood + "\nYou sit at the kitchen table and tally what happened.";
+    },
     options: w => [
       { key:"accept_score", label:"Accept the score. Walk away." },
     ],
     resolve: (w, k) => {
+      const owed = w.score.neighbors_owed_money || 0;
+      const bushLine = w.score.bushes_dead > 0
+        ? "  The blueberry bush, formerly of this address: deceased.\n"
+        : "  The blueberry bush is still alive. Today.\n";
+      const oweLine = owed > 0 ? "  Neighbors owed:                $" + owed + "\n" : "";
+      const codaIfWarm = (w.score.comedies_endured >= 2 && w.score.bushes_dead === 0 && owed === 0)
+        ? "\n  A small good day. They are scarce. You earned this one."
+        : "\n  You set the case down. The dogs continue without you. They always do.";
       return {
         narration:
-          "Bushes killed today:           " + w.score.bushes_dead + "\n" +
-          "Bones banked (Okie's vault):   " + w.bone_cache + "\n" +
-          "Comedies endured:              " + w.score.comedies_endured + "\n" +
-          "Anxiety, final:                " + w.okie_anxiety + "/10\n\n" +
-          "You set the case down. The dogs continue without you. They always do.",
+          bushLine +
+          "  Bones banked (Okie's vault):   " + w.bone_cache + "\n" +
+          "  Comedies endured:              " + w.score.comedies_endured + "\n" +
+          oweLine +
+          "  Anxiety, final:                " + w.okie_anxiety + "/10" +
+          codaIfWarm,
         end_case: true
       };
     },
@@ -695,6 +756,8 @@ function newCase(id) {
   activeCase = CASES[id] || CASES.default;
   world.case_id = activeCase.title;
   queue = [...activeCase.seed];
+  caseSeedSize = activeCase.seed.length;
+  caseEncountersShown = 0;
   feed.innerHTML = "";
   closer.innerHTML = "";
   caseTitle.textContent = activeCase.title;
@@ -704,9 +767,17 @@ function newCase(id) {
   updateHud();
 }
 
+// Track of total encounters in the current case for the progress badge.
+let caseSeedSize = 0;
+let caseEncountersShown = 0;
+let activeOptions = [];   // current encounter's options, for keyboard input
+let activeOptsDiv = null; // current encounter's button container
+
 function presentNext() {
   if (queue.length === 0) {
-    closer.innerHTML = '<div class="case-closed"><div class="label">CASE CLOSED</div><div>Pick another from the panel, or start over.</div></div>';
+    closer.innerHTML = '<div class="case-closed"><div class="label">CASE CLOSED</div><div>Pick another from the panel, or warp / reset.</div></div>';
+    activeOptions = [];
+    activeOptsDiv = null;
     saveState();
     return;
   }
@@ -718,51 +789,95 @@ function presentNext() {
     return;
   }
 
+  caseEncountersShown++;
+  const progressLabel = caseSeedSize > 1
+    ? '<span class="progress-badge">' + caseEncountersShown + ' / ~' + caseSeedSize + '</span>'
+    : '';
+
   const wrap = document.createElement("div");
   wrap.className = "encounter";
   wrap.innerHTML =
-    '<div class="enc-title">' + enc.title + '</div>' +
+    '<div class="enc-title">' + progressLabel + enc.title + '</div>' +
     '<div class="enc-narration">' + escapeHtml(enc.intro(world)) + '</div>' +
-    '<div class="options"></div>';
+    '<div class="options"></div>' +
+    '<div class="key-hint">tip: press 1–9 to pick</div>';
   feed.appendChild(wrap);
 
   const optsDiv = wrap.querySelector(".options");
   const opts = enc.options(world);
+  activeOptions = opts;
+  activeOptsDiv = optsDiv;
+  optsDiv._enc = enc;   // for the keyboard handler
   opts.forEach((o, i) => {
     const b = document.createElement("button");
     b.className = "option";
     b.innerHTML = '<span class="num">' + (i+1) + '.</span>' + escapeHtml(o.label);
-    b.onclick = () => {
-      // disable buttons
-      optsDiv.querySelectorAll("button").forEach(x => x.disabled = true);
-      // mark choice
-      const mark = document.createElement("div");
-      mark.className = "chosen-mark";
-      mark.textContent = "→ chose: " + o.label;
-      optsDiv.appendChild(mark);
-      // resolve
-      const res = enc.resolve(world, o.key);
-      if (res && res.narration) {
-        const r = document.createElement("div");
-        r.className = "enc-resolution";
-        if (res.red) r.style.color = "#f55";
-        r.textContent = res.narration;
-        wrap.appendChild(r);
-      }
-      if (res && res.next) queue = [...res.next, ...queue];
-      updateHud();
-      saveState();
-      if (res && res.end_case) {
-        closer.innerHTML = '<div class="case-closed"><div class="label">CASE CLOSED</div><div>' + escapeHtml(res.narration || "") + '</div></div>';
-        return;
-      }
-      // small delay so the player reads the resolution
-      window.scrollTo({top: document.body.scrollHeight, behavior: "smooth"});
-      setTimeout(presentNext, 350);
-    };
+    b.onclick = () => pickOption(wrap, optsDiv, opts, i, enc);
     optsDiv.appendChild(b);
   });
   window.scrollTo({top: document.body.scrollHeight, behavior: "smooth"});
+}
+
+function pickOption(wrap, optsDiv, opts, i, enc) {
+  if (!optsDiv || optsDiv !== activeOptsDiv) return;   // stale
+  const o = opts[i];
+  if (!o) return;
+  optsDiv.querySelectorAll("button").forEach(x => x.disabled = true);
+  const mark = document.createElement("div");
+  mark.className = "chosen-mark";
+  mark.textContent = "→ chose: " + o.label;
+  optsDiv.appendChild(mark);
+  const res = enc.resolve(world, o.key);
+  if (res && res.narration) {
+    const r = document.createElement("div");
+    r.className = "enc-resolution";
+    if (res.red) r.style.color = "#f55";
+    r.textContent = res.narration;
+    wrap.appendChild(r);
+  }
+  if (res && res.next) queue = [...res.next, ...queue];
+  updateHud();
+  saveState();
+  activeOptions = []; activeOptsDiv = null;
+  if (res && res.end_case) {
+    closer.innerHTML = '<div class="case-closed"><div class="label">CASE CLOSED</div><div>' + escapeHtml(res.narration || "") + '</div></div>';
+    return;
+  }
+  window.scrollTo({top: document.body.scrollHeight, behavior: "smooth"});
+  setTimeout(presentNext, 350);
+}
+
+// Keyboard: 1-9 picks current encounter's option N. Ignored if focus is in input.
+window.addEventListener("keydown", (e) => {
+  const tag = (document.activeElement && document.activeElement.tagName) || "";
+  if (tag === "INPUT" || tag === "TEXTAREA") return;
+  const n = parseInt(e.key, 10);
+  if (Number.isInteger(n) && n >= 1 && n <= activeOptions.length && activeOptsDiv) {
+    e.preventDefault();
+    // Find the wrapper (parent .encounter) for the active opts.
+    const wrap = activeOptsDiv.closest(".encounter");
+    // Re-derive enc from the title is awkward; use closure: store enc on optsDiv.
+    pickOption(wrap, activeOptsDiv, activeOptions, n - 1, activeOptsDiv._enc);
+  }
+});
+
+// Reset world state without changing the case (preserves progress queue).
+function resetWorldOnly() {
+  const oldQueue = [...queue];
+  const oldShown = caseEncountersShown;
+  world = initialWorld();
+  if (activeCase) world.case_id = activeCase.title;
+  queue = oldQueue;
+  caseEncountersShown = oldShown;
+  // Insert a banner so the player sees what happened.
+  const banner = document.createElement("div");
+  banner.className = "encounter";
+  banner.style.borderLeftColor = "var(--ink-dim)";
+  banner.innerHTML = '<div class="enc-title" style="color:var(--ink-dim)">⟪ WORLD RESET ⟫</div>' +
+    '<div class="enc-narration" style="font-style:italic; color:var(--ink-dim);">— bush back to alive, anxiety back to baseline, score zeroed; case continues —</div>';
+  feed.appendChild(banner);
+  updateHud();
+  saveState();
 }
 
 function updateHud() {
@@ -820,7 +935,13 @@ function escapeHtml(s) {
 }
 
 function saveState() {
-  try { localStorage.setItem("dogsgame.noir", JSON.stringify({world, queue, caseId: activeCase ? Object.keys(CASES).find(k => CASES[k] === activeCase) : "default"})); } catch (e) {}
+  try {
+    localStorage.setItem("dogsgame.noir", JSON.stringify({
+      world, queue,
+      caseId: activeCase ? Object.keys(CASES).find(k => CASES[k] === activeCase) : "default",
+      caseSeedSize, caseEncountersShown,
+    }));
+  } catch (e) {}
 }
 function loadState() {
   try {
@@ -829,6 +950,8 @@ function loadState() {
     const j = JSON.parse(s);
     world = j.world; queue = j.queue; activeCase = CASES[j.caseId] || CASES.default;
     if (!world || !queue) return false;
+    caseSeedSize = j.caseSeedSize || activeCase.seed.length;
+    caseEncountersShown = j.caseEncountersShown || 0;
     caseTitle.textContent = activeCase.title;
     opening.textContent = activeCase.opening;
     feed.innerHTML = '<div class="encounter" style="opacity:0.6"><em>(restored from previous session)</em></div>';
