@@ -693,6 +693,146 @@ const ENCOUNTERS = {
     },
   },
 
+  // ===== Inter-dog dynamics (B017 / B018 / B019) =====
+
+  okie_garage_avoidance: {
+    title: "OKIE WON'T COME IN (B017)",
+    intro: w => "I went into the garage. Attila and Tex were already in there.\nOkie stopped at the door. He didn't whine. He just wouldn't come in.",
+    options: w => [
+      { key:"carry",     label:"Pick him up and carry him in." },
+      { key:"call_out",  label:"Call Tex and Attila out first." },
+      { key:"leave",     label:"Leave the door open. Let him decide." },
+      { key:"close",     label:"Close the door. Talk to him outside." },
+    ],
+    resolve: (w, k) => {
+      if (k === "carry")    return { narration: "I picked him up and carried him in. He let me. Once he was in he was fine.", next:[] };
+      if (k === "call_out") return { narration: "Tex and Attila came out when I called. Okie went in after them. He went straight to the kiddie pool.", next:[] };
+      if (k === "leave")    return { narration: "He stood at the door for a while. Eventually he turned around and walked back to the living room.", next:[] };
+      if (k === "close")    { w.okie_anxiety = Math.max(0, w.okie_anxiety - 1); return { narration: "I closed the door so he could see he wasn't being shut out, exactly. We sat outside it together for a minute.", next:[] }; }
+    },
+  },
+
+  okie_roughhouse: {
+    title: "OKIE WANTS TO PLAY (B018)",
+    intro: w => "Okie's pawing at Tex. Play-bow, then a body-check, then more pawing.\nTex is just lying there. Okie hasn't given up.",
+    options: w => [
+      { key:"watch",     label:"Let them work it out." },
+      { key:"call_off",  label:"Call Okie off." },
+      { key:"encourage", label:"Encourage Tex to play back." },
+      { key:"separate",  label:"Send Okie outside for a minute." },
+    ],
+    resolve: (w, k) => {
+      if (k === "watch")     return { narration: "After about a minute Tex sighed and got up. They wrestled for a few seconds and then Tex was done.", next:[] };
+      if (k === "call_off")  { w.okie_anxiety = Math.min(10, w.okie_anxiety + 1); return { narration: "Okie came when I called. He looked annoyed. Tex closed his eyes again.", next:[] }; }
+      if (k === "encourage") return { narration: "Tex got up and played for about thirty seconds. Then he was done. Okie wanted more.", next:["tex_garage_retreat"] };
+      if (k === "separate")  return { narration: "I sent Okie out to the yard. He went. Tex stayed inside. Both happier.", next:[] };
+    },
+  },
+
+  tex_garage_retreat: {
+    title: "TEX HAS HAD ENOUGH (B019)",
+    intro: w => "Tex got up and walked toward the garage. Okie watched him go.\nIt looked like Tex was trying to get away from him.",
+    options: w => [
+      { key:"open_door", label:"Open the garage door for Tex." },
+      { key:"block",     label:"Block Tex. Make him deal with Okie." },
+      { key:"distract",  label:"Distract Okie so Tex can get past." },
+      { key:"watch",     label:"Just watch what happens." },
+    ],
+    resolve: (w, k) => {
+      if (k === "open_door") return { narration: "I opened the door. Tex went in. Attila followed him. Okie stayed at the door (see B017).", next:[] };
+      if (k === "block")     { w.okie_anxiety = Math.min(10, w.okie_anxiety + 1); return { narration: "I stood in front of the garage door. Tex looked at me, then at Okie, then sighed and went to lie down somewhere else.", next:[] }; }
+      if (k === "distract")  return { narration: "I called Okie over and gave him my attention. Tex slipped past and went into the garage. Attila came along.", next:[] };
+      if (k === "watch")     return { narration: "Tex made it to the garage door. Okie tried one more paw on the way. Tex went in anyway.", next:[] };
+    },
+  },
+
+  // ===== Speculative scenes (not in canon — extrapolated from known dog behavior) =====
+
+  mail_carrier: {
+    title: "MAIL CARRIER [spec]",
+    intro: w => "The mail carrier's truck pulled up. The truck makes a specific sound.\nAll four dogs heard it. Three of them barked.",
+    options: w => [
+      { key:"shush",   label:"Go shush them." },
+      { key:"watch",   label:"Watch through the window with them." },
+      { key:"answer",  label:"Open the door — package on the porch." },
+      { key:"ignore",  label:"Ignore it. Mail's not important." },
+    ],
+    resolve: (w, k) => {
+      if (k === "shush")  return { narration: "I shushed them. They quieted for the time it took the truck to pull away.", next:[] };
+      if (k === "watch")  { w.score.comedies_endured++; return { narration: "I stood at the window with them. They tracked the truck the whole way down the street.", next:[] }; }
+      if (k === "answer") return { narration: "I opened the door. Package on the porch. The dogs surged. I got the package. Nobody escaped this time.", next:[] };
+      if (k === "ignore") return { narration: "I let them bark it out. About forty seconds total. The mail will still be there.", next:[] };
+    },
+  },
+
+  stranger_at_door: {
+    title: "STRANGER AT THE DOOR [spec]",
+    intro: w => "Doorbell. None of these dogs are subtle about a doorbell.\nOkie barks high and fast. Tex barks lower. Attila barks once, big.\nCrockett barks late, surprised.",
+    options: w => [
+      { key:"answer",     label:"Answer with all four still barking." },
+      { key:"corral",     label:"Put them in the bedroom first." },
+      { key:"hold_attila", label:"Just hold Attila's collar and answer." },
+      { key:"ignore",     label:"Pretend nobody's home." },
+    ],
+    resolve: (w, k) => {
+      if (k === "answer")      { w.score.comedies_endured++; return { narration: "I opened the door. The chorus continued. The visitor — package delivery — looked tolerant. I signed quickly.", next:[] }; }
+      if (k === "corral")      return { narration: "Took two minutes to get all four into the bedroom. By then whoever it was had left a note.", next:[] };
+      if (k === "hold_attila") return { narration: "Attila's the one strangers worry about. I held his collar. The other three swirled. Nobody got bitten.", next:[] };
+      if (k === "ignore")      { w.score.comedies_endured++; return { narration: "I sat very still. The dogs barked. Whoever it was left. The dogs were vindicated.", next:[] }; }
+    },
+  },
+
+  doorway_block: {
+    title: "ATTILA IN THE DOORWAY [spec]",
+    intro: w => "Attila is lying across the doorway between the kitchen and the living room.\nHe's 100 pounds. He's not moving for anyone.",
+    options: w => [
+      { key:"step_over", label:"Step over him." },
+      { key:"command",   label:"Tell him to move." },
+      { key:"go_around", label:"Take the long way through the dining room." },
+      { key:"sit_with",  label:"Sit on the floor with him for a minute." },
+    ],
+    resolve: (w, k) => {
+      if (k === "step_over") return { narration: "I stepped over. He didn't react. He's seen me do this before.", next:[] };
+      if (k === "command")   { w.score.comedies_endured++; return { narration: "I told him to move. He looked at me. He sighed. He shifted approximately two inches. I stepped over.", next:[] }; }
+      if (k === "go_around") return { narration: "I went the long way. He won.", next:[] };
+      if (k === "sit_with")  { w.okie_anxiety = Math.max(0, w.okie_anxiety - 1); return { narration: "I sat down. He put his head in my lap. I forgot what I was doing in the kitchen.", next:[] }; }
+    },
+  },
+
+  yard_other_dog: {
+    title: "ANOTHER DOG WALKING PAST [spec]",
+    intro: w => "Someone walking their dog past our fence. All four of ours saw it.\nOkie's at the fence first. Tex right behind him. Attila trotted up.\nCrockett is barking from the porch — he can't see anything.",
+    options: w => [
+      { key:"call_in",  label:"Call them all inside." },
+      { key:"watch",    label:"Let them have it. The other dog's already past." },
+      { key:"separate", label:"Get Okie inside first — he's the loudest." },
+      { key:"wave",     label:"Wave at the neighbor." },
+    ],
+    resolve: (w, k) => {
+      if (k === "call_in")  return { narration: "I called them in. Three came right away. Okie took longer. The other dog was a block away by the time he gave up.", next:[] };
+      if (k === "watch")    return { narration: "I let them be. Eventually they all stopped — the other dog was out of range. They came back inside one at a time.", next:[] };
+      if (k === "separate") return { narration: "I got Okie inside. The volume dropped a lot. The other three trickled in over the next few minutes.", next:[] };
+      if (k === "wave")     { w.score.comedies_endured++; return { narration: "I waved. The neighbor waved back, but warily. He has met Okie.", next:[] }; }
+    },
+  },
+
+  greeting_ritual: {
+    title: "COMING HOME [spec]",
+    intro: w => "I came home. Each dog had their own thing.\nOkie spun in tight circles. Tex flopped onto his back as soon as he saw me.\nAttila walked up slowly and pressed his head against my leg.\nCrockett looked up, recognized me, and put his head back down.",
+    options: w => [
+      { key:"all_at_once", label:"Greet everyone at once." },
+      { key:"in_order",    label:"One at a time, in order of approach." },
+      { key:"crockett",    label:"Go straight to Crockett, who didn't get up." },
+      { key:"keys_first",  label:"Put my stuff down first. Make them wait." },
+    ],
+    resolve: (w, k) => {
+      if (k === "all_at_once") { w.score.comedies_endured++; return { narration: "I crouched and got mauled. Tex's belly got a quick rub. Okie spun harder. Attila leaned in. Crockett accepted a head-pat from across the room.", next:[] }; }
+      if (k === "in_order")    return { narration: "Okie first (still spinning). Tex (rolled up). Attila (already pressing). Crockett (didn't get up, accepted a kiss on the head). Took a minute.", next:[] };
+      if (k === "crockett")    { w.okie_anxiety = Math.min(10, w.okie_anxiety + 1); return { narration: "I stepped past the others and went to Crockett. He looked surprised in a good way. The other three regrouped behind me.", next:[] }; }
+      if (k === "keys_first")  return { narration: "I put my keys down. The dogs held formation, waiting. Then I went down.", next:[] };
+    },
+  },
+
   tex_finds_cache: {
     title: "TEX FOUND IT (B005-RAID)",
     intro: w => "I went into the garage and Tex was already in there.\nHe'd nosed under the kiddie-pool blanket and pulled a bone out. He was chewing it.\nOkie was watching from the doorway.",
@@ -926,6 +1066,14 @@ const SCENE_INDEX = [
   ["gate_escape_part2",        "B016b — Recovery"],
   ["crockett_sundowning",      "B-Crockett — 2 AM"],
   ["tex_finds_cache",          "B005-RAID — Tex Found It"],
+  ["okie_garage_avoidance",    "B017 — Okie Won't Come In"],
+  ["okie_roughhouse",          "B018 — Okie Wants To Play"],
+  ["tex_garage_retreat",       "B019 — Tex Has Had Enough"],
+  ["mail_carrier",             "Mail Carrier [spec]"],
+  ["stranger_at_door",         "Stranger At The Door [spec]"],
+  ["doorway_block",            "Attila In The Doorway [spec]"],
+  ["yard_other_dog",           "Another Dog Walking Past [spec]"],
+  ["greeting_ritual",          "Coming Home [spec]"],
   ["debrief",                  "DEBRIEF"],
 ];
 

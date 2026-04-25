@@ -24,6 +24,9 @@ Numeric catalog of every observed real-world dog behavior, with a one-line hook.
 | B014 | All four | Tennis ball disappointment (Dalamar echo) | Negative-space mechanic; historical dog as narrative foil |
 | B015 | All four | Dog park zoomies | Environment as the hidden mechanic |
 | B016 | Okie + Tex | Gate-open escape incident | Story-arc candidate; perfect noir-case material |
+| B017 | Okie | Garage avoidance when others inside | Social space-reading; refuses to enter when Tex/Attila already there |
+| B018 | Okie | Roughhouse solicitation toward Tex | Play-bow / pawing / mouthing; Tex doesn't always reciprocate |
+| B019 | Tex | Garage retreat from Okie | Same room as B006 (Okie's refuge), opposite function |
 
 ---
 
