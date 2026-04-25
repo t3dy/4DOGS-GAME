@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>DOGSGAME — four-era showcase</title>
+<style>
+  /* ----- shared ----- */
+  body {
+    margin: 0;
+    background: #1a1a1a;
+    color: #ccc;
+    font-family: "Menlo", "Consolas", "Courier New", monospace;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+  header {
+    background: #000;
+    padding: 12px 20px;
+    border-bottom: 1px solid #333;
+  }
+  header h1 { margin: 0; font-size: 18px; color: #fff; letter-spacing: 2px; }
+  header .sub { color: #888; font-size: 12px; margin-top: 4px; }
+  nav {
+    display: flex;
+    background: #111;
+    border-bottom: 1px solid #333;
+  }
+  nav button {
+    flex: 1;
+    background: none;
+    color: #888;
+    border: none;
+    border-right: 1px solid #333;
+    padding: 12px;
+    font-family: inherit;
+    font-size: 13px;
+    cursor: pointer;
+    letter-spacing: 1px;
+  }
+  nav button:hover { background: #222; color: #ddd; }
+  nav button.active { background: #222; color: #fff; border-bottom: 2px solid #c33; }
+  main { padding: 24px; max-width: 900px; margin: 0 auto; }
+  section.scene { display: none; }
+  section.scene.active { display: block; }
+  h2 { color: #fff; font-size: 14px; letter-spacing: 1px; margin-top: 0; }
+  .meta { color: #666; font-size: 12px; margin-bottom: 16px; }
+
+  /* ----- TEXT (Deja Vu noir) ----- */
+  #text .frame {
+    background: #000;
+    color: #ddd;
+    padding: 24px;
+    border: 1px solid #c33;
+    border-radius: 2px;
+  }
+  #text .narration { white-space: pre-wrap; min-height: 200px; line-height: 1.7; }
+  #text .narration .red { color: #f55; }
+  #text .verbs {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 4px;
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid #c33;
+  }
+  #text .verbs button {
+    background: #220000;
+    color: #ddd;
+    border: 1px solid #c33;
+    padding: 8px;
+    font-family: inherit;
+    font-size: 12px;
+    cursor: pointer;
+    letter-spacing: 1px;
+  }
+  #text .verbs button:hover { background: #c33; color: #000; }
+  #text .verbs button:disabled { opacity: 0.3; cursor: not-allowed; }
+
+  /* ----- ULTIMA5 ----- */
+  #ultima5 .layout {
+    display: grid;
+    grid-template-columns: 1fr 200px;
+    gap: 12px;
+  }
+  #ultima5 .map {
+    background: #000;
+    padding: 12px;
+    border: 2px solid #888;
+    font-size: 22px;
+    line-height: 1;
+    letter-spacing: 6px;
+    color: #4a4;
+  }
+  #ultima5 .map .row { display: block; }
+  #ultima5 .map .okie { color: #cc4; }
+  #ultima5 .map .bush { color: #4cf; }
+  #ultima5 .map .dead { color: #844; }
+  #ultima5 .hud {
+    background: #000;
+    border: 2px solid #888;
+    padding: 12px;
+    font-size: 12px;
+  }
+  #ultima5 .hud .label { color: #888; }
+  #ultima5 .hud .bar {
+    background: #222; height: 8px; margin: 2px 0 8px;
+  }
+  #ultima5 .hud .bar div { background: #4a4; height: 100%; }
+  #ultima5 .controls { margin-top: 12px; }
+  #ultima5 .controls button {
+    background: #222; color: #4a4; border: 1px solid #444;
+    padding: 4px 10px; font-family: inherit; font-size: 12px;
+    margin: 2px; cursor: pointer; letter-spacing: 1px;
+  }
+  #ultima5 .controls button:hover { background: #4a4; color: #000; }
+  #ultima5 .log {
+    margin-top: 16px; padding: 12px; background: #000;
+    border-left: 3px solid #4a4; min-height: 80px; font-style: italic;
+  }
+
+  /* ----- SIMS ----- */
+  #sims .room {
+    background: linear-gradient(135deg, #2a3441, #3a4a5a);
+    height: 280px; position: relative;
+    border-radius: 4px; overflow: hidden;
+    display: flex; align-items: center; justify-content: center;
+  }
+  #sims .bed {
+    position: absolute; bottom: 40px; left: 50%; transform: translateX(-50%);
+    width: 220px; height: 90px;
+    background: #6a4d3a; border-radius: 6px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+  }
+  #sims .pillow {
+    position: absolute; top: 8px; left: 16px; width: 60px; height: 30px;
+    background: #d4c4a0; border-radius: 4px;
+  }
+  #sims .ted {
+    position: absolute; top: 18px; left: 80px; width: 24px; height: 60px;
+    background: #c4b08a; border-radius: 50% 50% 0 0;
+    border: 2px solid #4a3520;
+  }
+  #sims .okie {
+    position: absolute; bottom: 10px; right: 16px; width: 70px; height: 50px;
+    background: #b8895c;
+    border-radius: 30px 50% 30% 50%;
+    border: 2px solid #3a2510;
+    cursor: pointer;
+  }
+  #sims .okie::before {
+    content: "👅"; position: absolute; top: -12px; right: -2px;
+    font-size: 16px;
+  }
+  #sims .thoughtbubble {
+    position: absolute; top: 20px; right: 20px;
+    background: #fff; color: #000; padding: 8px 12px; border-radius: 14px;
+    font-size: 12px;
+  }
+  #sims .pie {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    background: rgba(0,0,0,0.85); border-radius: 50%;
+    width: 220px; height: 220px;
+    display: none; flex-wrap: wrap;
+    border: 2px solid #fff;
+  }
+  #sims .pie.show { display: flex; }
+  #sims .pie button {
+    flex: 1 1 50%; background: none; color: #fff; border: 1px solid #555;
+    font-family: inherit; font-size: 14px; cursor: pointer;
+  }
+  #sims .pie button:hover { background: #c33; }
+  #sims .info {
+    margin-top: 16px; padding: 12px; background: #1a1f24;
+    border-radius: 4px; font-size: 12px;
+  }
+  #sims .info .label { color: #888; }
+  #sims .info .value { color: #fff; font-weight: bold; }
+  #sims .outcome {
+    margin-top: 12px; padding: 12px; background: #000;
+    color: #cfc; min-height: 40px; font-style: italic; border-left: 3px solid #4c8;
+  }
+
+  /* ----- NES ----- */
+  #nes .crt {
+    background: #000;
+    padding: 24px;
+    border: 8px solid #c33;
+    border-radius: 8px;
+    image-rendering: pixelated;
+    box-shadow: 0 0 40px rgba(204,51,51,0.3) inset;
+  }
+  #nes .screen {
+    background: #1a0000;
+    color: #f55;
+    font-family: "Courier New", monospace;
+    font-size: 16px;
+    line-height: 1.4;
+    padding: 16px;
+    text-align: center;
+    border: 2px solid #c33;
+  }
+  #nes .screen .title { font-size: 18px; letter-spacing: 4px; margin-bottom: 12px; }
+  #nes .pixelart {
+    font-family: monospace; font-size: 24px; line-height: 1;
+    margin: 16px 0; letter-spacing: 4px;
+  }
+  #nes .musicnotes { color: #ff8; font-size: 28px; letter-spacing: 8px; }
+  #nes .musicnotes.cycling span { animation: pulse 0.4s infinite alternate; }
+  #nes .musicnotes.cycling span:nth-child(2) { animation-delay: 0.1s; }
+  #nes .musicnotes.cycling span:nth-child(3) { animation-delay: 0.2s; }
+  #nes .musicnotes.cycling span:nth-child(4) { animation-delay: 0.3s; }
+  @keyframes pulse { from {opacity: 0.3} to {opacity: 1} }
+  #nes .msg { color: #fff; margin: 16px 0; font-size: 14px; min-height: 40px; }
+  #nes .controls {
+    display: flex; justify-content: center; gap: 24px; margin-top: 16px;
+  }
+  #nes .controls .btn {
+    width: 48px; height: 48px; border-radius: 50%; background: #c33;
+    color: #000; font-weight: bold; font-size: 18px; border: none;
+    cursor: pointer; box-shadow: 0 4px 0 #800;
+  }
+  #nes .controls .btn:active { transform: translateY(2px); box-shadow: 0 2px 0 #800; }
+  #nes .controls .label { font-size: 10px; color: #888; text-align: center; margin-top: 4px; }
+
+  footer { text-align: center; color: #444; padding: 24px; font-size: 11px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>D O G S G A M E — Four-Era Showcase</h1>
+  <div class="sub">Same dogs, four lenses. Click a tab. Click things inside. The state lives in your browser.</div>
+</header>
+
+<nav>
+  <button data-tab="text" class="active">TEXT (Deja Vu)</button>
+  <button data-tab="ultima5">ULTIMA V</button>
+  <button data-tab="sims">SIMS</button>
+  <button data-tab="nes">NES</button>
+</nav>
+
+<main>
+
+  <!-- ============ TEXT (DEJA VU NOIR) ============ -->
+  <section id="text" class="scene active">
+    <h2>SCENE: THE BLUEBERRY (B001)</h2>
+    <div class="meta">First-person noir. Verb grid below. Click the verbs in order.</div>
+    <div class="frame">
+      <div class="narration" id="textNarr">It was the kind of morning where the grass looked guilty. The bush was alive, for now. So was everyone else.
+
+The yard sloped away from the back porch. A blueberry bush sat in the middle distance, aggressively alive. Okie was here, blinking.
+
+You don't have to do anything. But you know what he's going to do.
+
+> <span class="red">Choose a verb.</span></div>
+      <div class="verbs">
+        <button data-verb="EXAMINE">EXAMINE</button>
+        <button data-verb="SPEAK">SPEAK TO</button>
+        <button data-verb="OPERATE">OPERATE</button>
+        <button data-verb="GO">GO</button>
+        <button data-verb="CALL">CALL</button>
+        <button data-verb="PET">PET</button>
+        <button data-verb="OPEN">OPEN GATE</button>
+        <button data-verb="WAIT">WAIT</button>
+        <button data-verb="PEE">PEE</button>
+        <button data-verb="LOOK">LOOK</button>
+        <button data-verb="LEAVE">LEAVE</button>
+        <button data-verb="SLEEP">SLEEP</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ ULTIMA V ============ -->
+  <section id="ultima5" class="scene">
+    <h2>SCENE: THE YARD (B001 in 16-color tiles)</h2>
+    <div class="meta">Use the direction buttons. Press P to pee on the current tile. Pee on the BUSH (♣) three times.</div>
+    <div class="layout">
+      <div>
+        <div class="map" id="u5map"></div>
+        <div class="controls">
+          <button onclick="u5move('n')">N</button>
+          <button onclick="u5move('s')">S</button>
+          <button onclick="u5move('w')">W</button>
+          <button onclick="u5move('e')">E</button>
+          <button onclick="u5pee()">P — Pee</button>
+          <button onclick="u5reset()">Reset</button>
+        </div>
+        <div class="log" id="u5log">"Thou stand at the patio. The morning is fair."</div>
+      </div>
+      <div class="hud">
+        <div class="label">OKIE</div>
+        <div class="label">HP</div><div class="bar"><div style="width: 100%"></div></div>
+        <div class="label">BLD</div><div class="bar"><div id="u5bld" style="width: 70%"></div></div>
+        <div class="label">ANX</div><div class="bar"><div style="width: 30%"></div></div>
+        <hr style="border: none; border-top: 1px solid #444; margin: 12px 0">
+        <div class="label">BUSH</div>
+        <div class="bar"><div id="u5bush" style="width: 100%"></div></div>
+        <div id="u5bushstate" style="color: #4a4; font-size: 10px;">ALIVE</div>
+        <hr style="border: none; border-top: 1px solid #444; margin: 12px 0">
+        <div class="label" style="font-size: 10px;">DAY 1 — DAWN</div>
+        <div class="label" style="font-size: 10px;">SULTAN FALLS</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ SIMS ============ -->
+  <section id="sims" class="scene">
+    <h2>SCENE: AFTERNOON BED (B012 — face-lick risk)</h2>
+    <div class="meta">Click on Okie to open the action pie. Decide: Dodge, Accept, or Think (about the yard scoop).</div>
+    <div class="info">
+      <span class="label">Yard scoop status:</span>
+      <span class="value" id="simsScoop">yesterday</span>
+      &nbsp;&nbsp;
+      <button onclick="simsRotateScoop()" style="background:#333; color:#ccc; border:1px solid #666; padding:2px 8px; font-family:inherit; cursor:pointer">⟳ Change</button>
+    </div>
+    <div class="room">
+      <div class="bed">
+        <div class="pillow"></div>
+        <div class="ted"></div>
+        <div class="okie" onclick="simsOpenPie()" title="Click for action menu"></div>
+      </div>
+      <div class="thoughtbubble" id="simsBubble">"hi."</div>
+      <div class="pie" id="simsPie">
+        <button onclick="simsAct('dodge')">Dodge</button>
+        <button onclick="simsAct('accept')">Accept</button>
+        <button onclick="simsAct('think')">Think</button>
+        <button onclick="simsClosePie()">Cancel</button>
+      </div>
+    </div>
+    <div class="outcome" id="simsOut">[click Okie to begin]</div>
+  </section>
+
+  <!-- ============ NES ============ -->
+  <section id="nes" class="scene">
+    <h2>SCENE: PRE-WALK WHINE (B010 — Attila + leash)</h2>
+    <div class="meta">Press A to clip the leash. Press B to open the garage door. Watch the whine cycle.</div>
+    <div class="crt">
+      <div class="screen">
+        <div class="title">⟪ THE GARAGE ⟫</div>
+        <div class="pixelart">
+          <span style="color:#fff">█ █ █ █ █</span><br>
+          <span style="color:#fff">█</span> <span id="nesAttila">🐶</span> <span style="color:#fff">█ █</span> <span id="nesDoor" style="color:#fff">🚪</span><br>
+          <span style="color:#fff">▓ ▓ ▓ ▓ ▓</span>
+        </div>
+        <div class="musicnotes" id="nesNotes">&nbsp;</div>
+        <div class="msg" id="nesMsg">ATTILA WAITS. HE IS CALM. (FOR NOW.)</div>
+      </div>
+      <div class="controls">
+        <div>
+          <button class="btn" onclick="nesB()">B</button>
+          <div class="label">DOOR</div>
+        </div>
+        <div>
+          <button class="btn" onclick="nesA()">A</button>
+          <div class="label">LEASH</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  DOGSGAME prototype mockups · Sultan, WA · the bush remembers
+</footer>
+
+<script>
+// ---------- nav ----------
+document.querySelectorAll('nav button').forEach(b => {
+  b.addEventListener('click', () => {
+    document.querySelectorAll('nav button').forEach(x => x.classList.remove('active'));
+    document.querySelectorAll('section.scene').forEach(x => x.classList.remove('active'));
+    b.classList.add('active');
+    document.getElementById(b.dataset.tab).classList.add('active');
+  });
+});
+
+// ---------- TEXT (Deja Vu noir) ----------
+const textNarr = document.getElementById('textNarr');
+const textState = { peeCount: 0, examined: false };
+
+const noirLines = {
+  EXAMINE: () => {
+    textState.examined = true;
+    return "  You look at the bush. Five years old. Productive. Beloved by no one in particular except the people who planted it. The leaves are still green. They will not be green for long. Trust me on this.";
+  },
+  SPEAK: () => "  You speak to Okie. He looks up. There is nothing in his eyes that suggests guilt. There is also nothing that suggests innocence. There is mostly tongue.",
+  OPERATE: () => "  Operate what? You're outside. There are no levers in the natural world.",
+  GO: () => "  Where? The yard is small. The fences are firm. You stay.",
+  CALL: () => "  You call Okie. He arrives, with the slow inevitability of weather.",
+  PET: () => "  You pet him. He accepts. A thin contract is signed.",
+  OPEN: () => "  You consider the gate. The last time it was open, something cost two hundred dollars. You do not open the gate.",
+  WAIT: () => "  You wait. The morning develops. Somewhere a logging truck climbs Basin Hill. Okie's bladder, somewhere, develops too.",
+  PEE: () => {
+    textState.peeCount++;
+    if (textState.peeCount === 1) return "  Okie circles once. Lifts a leg. The blueberry bush, which has seen this before, steels itself.\n  > <span class='red'>The bush is now YELLOWING.</span>";
+    if (textState.peeCount === 2) return "  Another stain. The leaves are the color of regret now. You give it three more days. Maybe two.\n  > <span class='red'>The bush is now WILTING.</span>";
+    if (textState.peeCount === 3) {
+      document.querySelectorAll('#text .verbs button').forEach(b => b.disabled = true);
+      return "\n  ─────────────────────────────────────────────\n  <span class='red'>THE BLUEBERRY BUSH IS DEAD.</span>\n  Cause of death: a small dog with strong opinions.\n  Suspect: in the room. Showing no remorse.\n  ─────────────────────────────────────────────\n\n  > <span class='red'>END OF SCENE.</span>";
+    }
+    return "  There is nothing left to mark. The bush is a memory.";
+  },
+  LOOK: () => textState.peeCount === 0 ? "  The bush is alive. The lawn slopes away. The fence holds." : `  The bush has been marked ${textState.peeCount} time${textState.peeCount === 1 ? '' : 's'}. It is keeping count.`,
+  LEAVE: () => "  Leave whom? You are the witness here. Witnesses don't leave.",
+  SLEEP: () => "  It is morning. Sleep would be premature."
+};
+
+document.querySelectorAll('#text .verbs button').forEach(b => {
+  b.addEventListener('click', () => {
+    const v = b.dataset.verb;
+    const line = noirLines[v]();
+    textNarr.innerHTML += "\n\n> <span class='red'>" + v + "</span>\n" + line;
+    textNarr.scrollTop = textNarr.scrollHeight;
+  });
+});
+
+// ---------- ULTIMA5 ----------
+const u5 = {
+  // 6x5 grid; ASCII match to canon/yard.md
+  layout: [
+    ["█","█","█","█","█","▓"],   // house + garage
+    ["░","░","░","░","░","▒"],   // patio + driveway
+    [",",",",",",",",",",","],
+    [",","♣",",","†",",",","],
+    ["~","~","✖","~","♠","♠"],
+  ],
+  pos: [4, 1],   // Okie on patio
+  bushHealth: 3,
+  bushPos: [1, 3],
+};
+
+function u5render() {
+  const map = document.getElementById('u5map');
+  let html = "";
+  for (let y = 0; y < u5.layout.length; y++) {
+    let row = "<span class='row'>";
+    for (let x = 0; x < u5.layout[y].length; x++) {
+      let ch = u5.layout[y][x];
+      let cls = "";
+      if (x === u5.pos[0] && y === u5.pos[1]) { ch = "🐕"; cls = "okie"; }
+      else if (ch === "♣") cls = "bush";
+      else if (ch === "✖") cls = "dead";
+      row += `<span class="${cls}">${ch}</span>`;
+    }
+    row += "</span>";
+    html += row;
+  }
+  map.innerHTML = html;
+  document.getElementById('u5bush').style.width = (u5.bushHealth / 3 * 100) + '%';
+  const states = ['DEAD', 'WILTING', 'YELLOWING', 'ALIVE'];
+  document.getElementById('u5bushstate').textContent = states[u5.bushHealth];
+  if (u5.bushHealth === 0) document.getElementById('u5bushstate').style.color = '#844';
+}
+
+function u5move(d) {
+  const [dx, dy] = {n:[0,-1], s:[0,1], e:[1,0], w:[-1,0]}[d];
+  const nx = u5.pos[0] + dx, ny = u5.pos[1] + dy;
+  if (ny < 0 || ny >= u5.layout.length || nx < 0 || nx >= u5.layout[0].length) {
+    u5log("Thou bumpeth the fence.");
+    return;
+  }
+  const t = u5.layout[ny][nx];
+  if (t === "█" || t === "▓" || t === "†" || t === "♠") {
+    u5log("Thy passage is denied by " + t);
+    return;
+  }
+  u5.pos = [nx, ny];
+  u5log("Thou movest " + d.toUpperCase());
+  u5render();
+}
+function u5pee() {
+  const [x, y] = u5.pos;
+  const t = u5.layout[y][x];
+  if (t === "♣" && u5.bushHealth > 0) {
+    u5.bushHealth--;
+    if (u5.bushHealth === 0) {
+      u5.layout[y][x] = "✖";
+      u5log("⚔ THE BLUEBERRY BUSH IS SLAIN ⚔");
+    } else {
+      u5log("The bush groweth wan. (" + u5.bushHealth + "/3)");
+    }
+  } else if (t === "░" || t === "▒") {
+    u5log("Thy mark findeth no purchase upon stone.");
+  } else {
+    u5log("Thou markest the ground.");
+  }
+  u5render();
+}
+function u5log(s) { document.getElementById('u5log').textContent = '"' + s + '"'; }
+function u5reset() {
+  u5.pos = [4,1]; u5.bushHealth = 3; u5.layout[3][1] = "♣";
+  u5log("The morning resumeth. The bush liveth again."); u5render();
+}
+u5render();
+
+// ---------- SIMS ----------
+const sims = { scoop: 'yesterday' };
+const scoopRotation = ['today', 'yesterday', "I don't want to talk about it"];
+
+function simsRotateScoop() {
+  const i = scoopRotation.indexOf(sims.scoop);
+  sims.scoop = scoopRotation[(i + 1) % scoopRotation.length];
+  document.getElementById('simsScoop').textContent = sims.scoop;
+}
+function simsOpenPie() {
+  document.getElementById('simsPie').classList.add('show');
+  document.getElementById('simsBubble').textContent = '"please."';
+}
+function simsClosePie() { document.getElementById('simsPie').classList.remove('show'); }
+function simsAct(a) {
+  simsClosePie();
+  let line = "";
+  if (a === 'dodge') {
+    line = "You turn your head. Okie's tongue grazes your cheek. Negligible damage. He looks affronted. He'll forget by dinner.";
+  } else if (a === 'accept') {
+    if (sims.scoop === 'today') line = "You let him. Warm and brief and undignified, like all good things. The yard is clean today. You earned this.";
+    else if (sims.scoop === 'yesterday') line = "You let him. Halfway through, you remember yesterday. You did not scoop. The taste, when it arrives, is informational.";
+    else line = "You let him. The lick lasts an unreasonable duration. You will taste this for hours. You knew. You did it anyway. There's a name for that.";
+  } else if (a === 'think') {
+    if (sims.scoop === 'today') line = "You think back. You scooped this morning. Probability: low. Risk tolerance: rising.";
+    else if (sims.scoop === 'yesterday') line = "You think back. Yesterday, maybe. The night was busy. Probability: medium.";
+    else line = "You decline to think about it. The math gets ugly. The lick will arrive on faith.";
+  }
+  document.getElementById('simsOut').textContent = line;
+}
+
+// ---------- NES ----------
+const nes = { leashed: false, doorOpen: false, whining: false };
+function nesA() {
+  if (!nes.leashed) {
+    nes.leashed = true; nes.whining = true;
+    document.getElementById('nesAttila').textContent = '🐕';
+    document.getElementById('nesNotes').innerHTML = '<span>♪</span><span>♪</span><span>♪</span><span>♪</span>';
+    document.getElementById('nesNotes').classList.add('cycling');
+    document.getElementById('nesMsg').textContent = "LEASH CLIPPED. ATTILA WHINES. (PUSH B FOR DOOR.)";
+  } else if (nes.doorOpen) {
+    document.getElementById('nesMsg').textContent = "WALK BEGINS. THE WHINE STOPS, EVENTUALLY.";
+    document.getElementById('nesNotes').classList.remove('cycling');
+    document.getElementById('nesNotes').innerHTML = '&nbsp;';
+  }
+}
+function nesB() {
+  if (!nes.leashed) {
+    document.getElementById('nesMsg').textContent = "LEASH HIM FIRST. (PUSH A.)";
+    return;
+  }
+  if (!nes.doorOpen) {
+    nes.doorOpen = true;
+    document.getElementById('nesDoor').textContent = '🌅';
+    document.getElementById('nesMsg').textContent = "DOOR OPEN. THE WHINE DOES NOT STOP. (PUSH A TO GO.)";
+  }
+}
+</script>
+</body>
+</html>

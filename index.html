@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>4DOGS-GAME</title>
+<style>
+  :root { --bg:#0a0a0a; --ink:#d8d8d8; --ink-dim:#888; --red:#c33; }
+  html, body { margin:0; padding:0; background:var(--bg); color:var(--ink);
+               font-family:"Courier New", monospace; min-height:100vh; }
+  body { display:flex; flex-direction:column; }
+  header { background:#000; border-bottom:2px solid var(--red); padding:18px 28px; }
+  header h1 { margin:0; font-size:22px; letter-spacing:6px; color:#fff; }
+  header .sub { color:var(--ink-dim); font-size:13px; letter-spacing:1px; margin-top:4px; }
+  main { flex:1; max-width:760px; margin:0 auto; padding:48px 28px; }
+  h2 { color:var(--red); font-size:13px; letter-spacing:3px; border-bottom:1px solid #722;
+       padding-bottom:6px; margin-top:0; }
+  p { line-height:1.7; color:var(--ink); }
+  .cards { display:grid; grid-template-columns:1fr 1fr; gap:18px; margin:32px 0; }
+  .card { background:#111; border:1px solid #444; padding:24px; text-decoration:none;
+          color:var(--ink); transition:border-color .15s, background .15s; display:block; }
+  .card:hover { background:#220000; border-color:var(--red); color:#fff; }
+  .card .label { color:var(--red); font-size:11px; letter-spacing:3px; }
+  .card h3 { margin:8px 0 6px; font-size:18px; color:#fff; }
+  .card p { margin:0; color:var(--ink-dim); font-size:13px; line-height:1.5; }
+  .meta { background:#111; border-left:3px solid var(--red); padding:14px 18px;
+          margin:24px 0; color:var(--ink-dim); font-size:13px; }
+  .roster { display:grid; grid-template-columns:repeat(2, 1fr); gap:8px;
+            margin:16px 0; font-size:13px; }
+  .roster .dog { padding:8px 12px; background:#111; border:1px solid #333; }
+  .roster .dog .name { color:var(--red); font-weight:bold; letter-spacing:1px; }
+  .roster .dog .desc { color:var(--ink-dim); font-size:11px; }
+  footer { border-top:1px solid #333; padding:18px 28px; color:#444; font-size:11px;
+           text-align:center; }
+  footer a { color:var(--ink-dim); text-decoration:none; }
+  footer a:hover { color:var(--red); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>4 D O G S &middot; G A M E</h1>
+  <div class="sub">A noir text-adventure prototype based on four real dogs in Sultan, WA.</div>
+</header>
+
+<main>
+
+  <h2>PLAY</h2>
+  <div class="cards">
+    <a class="card" href="code/noir.html">
+      <div class="label">▶ ENCOUNTER GAME</div>
+      <h3>Noir</h3>
+      <p>The full prototype. 17 numbered scenes, six cases, scene-warp, persistent state.
+         Pick a case from the sidebar or warp to any scene by number.</p>
+    </a>
+    <a class="card" href="code/showcase.html">
+      <div class="label">▶ FOUR-ERA MOCKUP</div>
+      <h3>Showcase</h3>
+      <p>The same dog-world rendered four ways: Deja Vu noir, Ultima V tile RPG,
+         isometric Sims, NES pixels. Click through the tabs.</p>
+    </a>
+  </div>
+
+  <h2>THE DOGS</h2>
+  <div class="roster">
+    <div class="dog"><div class="name">OKIE</div><div class="desc">Aussie. Anxious. Killed the bush. Bone banker.</div></div>
+    <div class="dog"><div class="name">TEX</div><div class="desc">Aussie. Bigger. Belly-roll specialist.</div></div>
+    <div class="dog"><div class="name">ATTILA</div><div class="desc">Bernese cross. 100 lb. Mild-mannered. Whines at leashes.</div></div>
+    <div class="dog"><div class="name">CROCKETT</div><div class="desc">11. Senior. Toy-thief. Arthritic. Wise.</div></div>
+  </div>
+
+  <h2>WHAT THIS IS</h2>
+  <p>Built from real-world dog observations. Each behavior in the game corresponds
+     to something one of these dogs actually does. The blueberry bush is dead in real life;
+     Okie really did kill it.</p>
+
+  <p>Engine notes, character sheets, era-mockups, and design dialogues live in this repo
+     under <code>canon/</code> and <code>design/</code>. The game runs in your browser —
+     no install, no server, state persists in localStorage between reloads.</p>
+
+  <div class="meta">
+    Voice: Deja Vu / Police Quest noir.<br>
+    Stack: vanilla HTML/CSS/JS, single file.<br>
+    Companion: a Python terminal version under <code>code/dogsim.py</code>.
+  </div>
+
+</main>
+
+<footer>
+  <a href="https://github.com/t3dy/4DOGS-GAME">github.com/t3dy/4DOGS-GAME</a>
+  &middot;
+  Sultan, WA
+  &middot;
+  the bush remembers
+</footer>
+
+</body>
+</html>

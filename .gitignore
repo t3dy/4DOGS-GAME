@@ -1,0 +1,9 @@
+__pycache__/
+*.pyc
+.DS_Store
+Thumbs.db
+*.swp
+.vscode/
+.idea/
+node_modules/
+data/dogsim.db
