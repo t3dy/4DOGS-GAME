@@ -237,6 +237,9 @@
       <div class="stat"><span>COMEDIES ENDURED</span><span class="v" id="sCom">0</span></div>
       <div class="stat"><span>NEIGHBORS OWED ($)</span><span class="v" id="sOwe">0</span></div>
     </div>
+
+    <h2 style="margin-top:18px">CASE JOURNAL</h2>
+    <div id="journalList" style="font-size:11px; line-height:1.5; max-height:240px; overflow-y:auto;"></div>
   </aside>
 </div>
 
@@ -262,10 +265,45 @@ const initialWorld = () => ({
   garage_door_open: false,
   score: { bushes_dead: 0, comedies_endured: 0 },
   case_id: "",
+  flashback_fired: false,   // anxiety-triggered flashback is one-shot per run
 });
 let world = initialWorld();
 let queue = [];
 let activeCase = null;
+let journal = [];             // running list of bullet strings for the sidebar
+
+function pushJournal(line) {
+  journal.push(line);
+  if (journal.length > 14) journal.shift();   // keep recent 14
+  renderJournal();
+}
+function renderJournal() {
+  const el = document.getElementById("journalList");
+  if (!el) return;
+  if (journal.length === 0) {
+    el.innerHTML = '<div style="color:var(--ink-dimmer); font-style:italic;">(nothing yet)</div>';
+    return;
+  }
+  el.innerHTML = journal.map(s => '<div style="margin:2px 0; padding-left:8px; border-left:1px solid var(--ink-dimmer);">' + escapeHtml(s) + '</div>').join("");
+}
+
+// Per-encounter tick: bladder fills, anxiety drifts toward Okie's baseline (3),
+// flashback fires once if anxiety crests 8.
+function tickWorld() {
+  const before = { bld: world.okie_bladder, anx: world.okie_anxiety };
+  world.okie_bladder = Math.min(10, world.okie_bladder + 1);
+  if (world.okie_anxiety > 3) world.okie_anxiety = Math.max(3, world.okie_anxiety - 1);
+  // Anxiety-triggered flashback (one-shot, queued before next encounter).
+  if (world.okie_anxiety >= 8 && !world.flashback_fired) {
+    world.flashback_fired = true;
+    queue.unshift("bed_destruction_flashback");
+    pushJournal("• anxiety crested → flashback triggered");
+  }
+  if (world.okie_bladder !== before.bld || world.okie_anxiety !== before.anx) {
+    // Don't journal every drift; only worth noting when bladder maxes out
+    if (world.okie_bladder === 10 && before.bld < 10) pushJournal("• Okie's bladder is full (10/10)");
+  }
+}
 
 // ============================================================================
 // ENCOUNTERS — same shape as dogsim.py
@@ -320,9 +358,12 @@ const ENCOUNTERS = {
         { key:"memorial", label:"Stand at the dead-bush tile. Pay your respects." },
         { key:"leave",    label:"Go back inside. Nothing left to do here." },
       ];
+      const peeLabel = w.okie_bladder > 0
+        ? "Let Okie pee on the bush."
+        : "Let Okie try to pee on the bush. (Bladder: empty.)";
       return [
         { key:"examine",  label:"Examine the bush. Take inventory." },
-        { key:"pee",      label:"Let Okie pee on the bush." },
+        { key:"pee",      label:peeLabel },
         { key:"call_off", label:"Call Okie away. Pee on the lawn instead." },
         { key:"leave",    label:"Leave the yard. Bush lives another day." },
       ];
@@ -330,6 +371,9 @@ const ENCOUNTERS = {
     resolve: (w, k) => {
       if (k === "examine") return { narration: "You examine the bush. Health: " + w.bush_health + "/3. Berries: theoretical.\nThe bush, for its part, examines you back.", next:["yard_bush"] };
       if (k === "pee") {
+        if (w.okie_bladder <= 0) {
+          return { narration: "Okie squats with conviction. Lifts a leg with conviction. The bush, prepared\nfor catastrophe, gets a thin disappointment instead. The bush, briefly, exhales.\nOkie is humiliated.", next:["yard_bush"] };
+        }
         w.bush_health--;
         w.okie_bladder = Math.max(0, w.okie_bladder - 3);
         if (w.bush_health <= 0) {
@@ -758,6 +802,8 @@ function newCase(id) {
   queue = [...activeCase.seed];
   caseSeedSize = activeCase.seed.length;
   caseEncountersShown = 0;
+  journal = [];
+  pushJournal("• case opened: " + activeCase.title);
   feed.innerHTML = "";
   closer.innerHTML = "";
   caseTitle.textContent = activeCase.title;
@@ -836,13 +882,18 @@ function pickOption(wrap, optsDiv, opts, i, enc) {
     wrap.appendChild(r);
   }
   if (res && res.next) queue = [...res.next, ...queue];
+  // Journal: short hand showing what just happened.
+  pushJournal("• " + enc.title.replace(/\s*\(.*\)\s*$/, "") + " → " + o.label.split(/[.!?]/)[0]);
   updateHud();
-  saveState();
   activeOptions = []; activeOptsDiv = null;
   if (res && res.end_case) {
     closer.innerHTML = '<div class="case-closed"><div class="label">CASE CLOSED</div><div>' + escapeHtml(res.narration || "") + '</div></div>';
+    saveState();
     return;
   }
+  // Tick the world (may inject a flashback).
+  tickWorld();
+  saveState();
   window.scrollTo({top: document.body.scrollHeight, behavior: "smooth"});
   setTimeout(presentNext, 350);
 }
@@ -876,6 +927,7 @@ function resetWorldOnly() {
   banner.innerHTML = '<div class="enc-title" style="color:var(--ink-dim)">⟪ WORLD RESET ⟫</div>' +
     '<div class="enc-narration" style="font-style:italic; color:var(--ink-dim);">— bush back to alive, anxiety back to baseline, score zeroed; case continues —</div>';
   feed.appendChild(banner);
+  pushJournal("• world reset (case continues)");
   updateHud();
   saveState();
 }
@@ -939,7 +991,7 @@ function saveState() {
     localStorage.setItem("dogsgame.noir", JSON.stringify({
       world, queue,
       caseId: activeCase ? Object.keys(CASES).find(k => CASES[k] === activeCase) : "default",
-      caseSeedSize, caseEncountersShown,
+      caseSeedSize, caseEncountersShown, journal,
     }));
   } catch (e) {}
 }
@@ -952,10 +1004,12 @@ function loadState() {
     if (!world || !queue) return false;
     caseSeedSize = j.caseSeedSize || activeCase.seed.length;
     caseEncountersShown = j.caseEncountersShown || 0;
+    journal = Array.isArray(j.journal) ? j.journal : [];
     caseTitle.textContent = activeCase.title;
     opening.textContent = activeCase.opening;
     feed.innerHTML = '<div class="encounter" style="opacity:0.6"><em>(restored from previous session)</em></div>';
     closer.innerHTML = "";
+    renderJournal();
     presentNext();
     updateHud();
     return true;
@@ -967,6 +1021,7 @@ function loadState() {
 // ============================================================================
 
 renderSceneIndex();
+renderJournal();
 if (!loadState()) newCase("default");
 </script>
 </body>
